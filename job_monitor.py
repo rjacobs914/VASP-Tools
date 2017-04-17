@@ -30,7 +30,7 @@ def main(resubmit_incomplete_jobs=False, submit_queued_jobs=False, resubmit_cras
     nonstarted_job_dirs, old_job_dirs, current_job_dirs = jobmonitor._get_nonstarted_and_old_jobs(directory_list=parsed_directory_list)
 
     if resubmit_incomplete_jobs == bool(True):
-        resubmitted_jobs = jobmonitor._resubmit_incomplete_jobs(incomplete_job_dirs=incomplete_job_dirs)
+        resubmitted_jobs = jobmonitor._resubmit_incomplete_jobs(incomplete_job_dirs=incomplete_job_dirs, old_job_dirs=old_job_dirs)
         logging.info('Finished resubmitting incomplete jobs')
     elif resubmit_incomplete_jobs == bool(False):
         logging.info('You have chosen not to resubmit incomplete jobs')

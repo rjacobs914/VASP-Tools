@@ -618,9 +618,10 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
         job_status_report_file.write("\n")
         job_status_report_file.write("The following directories contain jobs that are incomplete:" + "\n")
         for entry in incomplete_job_dirs:
-            job_status_report_file.write(str(entry) + "\n")
-        if len(incomplete_job_dirs)==0:
-            job_status_report_file.write("(There are no jobs that were found to be incomplete)" + "\n")
+            if entry not in old_job_dirs:
+                job_status_report_file.write(str(entry) + "\n")
+            if len(incomplete_job_dirs)==0:
+                job_status_report_file.write("(There are no jobs that were found to be incomplete)" + "\n")
 
         job_status_report_file.write("\n")
         job_status_report_file.write("The following directories contain jobs that completed:" + "\n")
@@ -654,25 +655,26 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
         return None
 
     @staticmethod
-    def _resubmit_incomplete_jobs(incomplete_job_dirs):
+    def _resubmit_incomplete_jobs(incomplete_job_dirs, old_job_dirs):
         resubmitted_job_dirs = []
         for directory in incomplete_job_dirs:
-            os.chdir(directory)
-            continue_dir = directory+"/"+"continue"
-            try:
-                os.mkdir(continue_dir)
-                shutil.copy("CONTCAR", continue_dir)
-                shutil.copy("KPOINTS", continue_dir)
-                shutil.copy("INCAR", continue_dir)
-                shutil.copy("POTCAR", continue_dir)
-                shutil.copy("submit.sh", continue_dir)
-                os.chdir(continue_dir)
-                shutil.move("CONTCAR", "POSCAR")
-                logging.info("Making new continuation folder and resubmitting the job from directory %s" % (continue_dir))
-                subprocess.Popen(['sbatch', 'submit.sh']).communicate()
-                resubmitted_job_dirs.append(continue_dir)
-            except(OSError):
-                continue
+            if directory not in old_job_dirs:
+                os.chdir(directory)
+                continue_dir = directory+"/"+"continue"
+                try:
+                    os.mkdir(continue_dir)
+                    shutil.copy("CONTCAR", continue_dir)
+                    shutil.copy("KPOINTS", continue_dir)
+                    shutil.copy("INCAR", continue_dir)
+                    shutil.copy("POTCAR", continue_dir)
+                    shutil.copy("submit.sh", continue_dir)
+                    os.chdir(continue_dir)
+                    shutil.move("CONTCAR", "POSCAR")
+                    logging.info("Making new continuation folder and resubmitting the job from directory %s" % (continue_dir))
+                    subprocess.Popen(['sbatch', 'submit.sh']).communicate()
+                    resubmitted_job_dirs.append(continue_dir)
+                except(OSError):
+                    continue
         return resubmitted_job_dirs
 
     @staticmethod
