@@ -29,115 +29,155 @@ from scipy import integrate
 import itertools
 import xlsxwriter
 
-class SurfaceEnergyAnalyzer(object):
-    """
-    This class is designed to create Wulff constructions and output useful properties from the Wulff construction based
-    on input of a material structure and data on surface orientation and surface energies.
-    <Args>:
+class WulffWrapper(object):
+    """A wrapper class to the pymatgen Wulff analysis tools.
+    args:
         poscar: (str) The name of a POSCAR file
         miller_indices: (list of tuples) A list of miller indices, where each miller index is represented as a tuple.
             For example, miller_indices = [(1, 0, 0), (1, 1, 0), (1, 1, 1)]
         surface_energies: (list of floats) A list of calculated surface energies to pair with the list of miller indices.
     """
-    def __init__(self, poscar, miller_indices, surface_energies):
-        self.poscar = poscar
+    def __init__(self, miller_indices, surface_energies, poscar="POSCAR"):
         self.miller_indices = miller_indices
         self.surface_energies = surface_energies
+        self.poscar = poscar
 
-    @property
     def get_wulff_construction(self):
-        """
-        This function creates a plot of the Wulff construction
-        <Returns>: Nothing, but writes a Wulff construction graphic to file
-        <Type>: pdf file
-        """
-        return self._calc_wulff_construction()
-
-    @property
-    def get_wulff_area_fraction(self):
-        """
-        This function outputs the area fraction of each surface of the Wulff construction
-        <Returns>: Dictionary of {miller_index : area_fraction} pairs
-        <Type>: dict
-        """
-        return self._calc_wulff_area_fraction()
-
-    @property
-    def get_wulff_surface_energies(self):
-        """
-        This function outputs the surface energy of each surface of the Wulff construction
-        <Returns>: Dictionary of {miller_index : surface_energy} pairs
-        <Type>: dict
-        """
-        return self._calc_wulff_surface_energies()
-
-    def _calc_wulff_construction(self):
         #Need to get lattice object from POSCAR file
         lattice_parameters = PoscarAnalyzer(poscar=self.poscar).get_lattice_parameters
         lattice_object = lattice.Lattice(lattice_parameters)
         #Make Wulff construction
-        wulff_construction = wulff.WulffShape(lattice_object, self.miller_indices, self.surface_energies)
+        wulff_construction = wulff.WulffShape(lattice=lattice_object, miller_list=self.miller_indices,
+                                              e_surf_list=self.surface_energies)
         wulff_plot = wulff_construction.get_plot()
-        wulff_plot.savefig('Wulff.pdf')
+        wulff_plot.savefig('wulff_construction.pdf')
         return wulff_construction
 
-    def _calc_wulff_area_fraction(self):
+    def get_wulff_area_fraction(self):
         wulff_construction = self.get_wulff_construction
         wulff_area = wulff_construction.area_fraction_dict
         return wulff_area
 
-    def _calc_wulff_surface_energies(self):
+    def get_wulff_surface_energies(self):
         wulff_construction = self.get_wulff_construction
         wulff_energies = wulff_construction.miller_energy_dict
         return wulff_energies
 
-class SurfacePotentialAnalyzer(object):
-    """
-    This class is designed plot the LOCPOT file, which contains data of the electrostatic potential as a function of
+class LocpotAnalyzer(object):
+    """This class is designed plot the LOCPOT file, which contains data of the electrostatic potential as a function of
     position in the simulated supercell.
-    <Args>:
+    args:
         poscar: (str) The name of a POSCAR file
         outcar: (str) The name of an OUTCAR file
         locpot: (str) the name of a LOCPOT file
-    <Example usage>:
+    example usage:
         surfpot = SurfacePotentialAnalyzer(poscar="POSCAR", outcar="OUTCAR", locpot="LOCPOT")
         surfpot.get_electrostatic_plot #Plot the electrostatic potential
         surfpot.get_workfunction #Obtain values of the work function
     """
-    def __init__(self, poscar, outcar, locpot):
+    def __init__(self, poscar="POSCAR", outcar="OUTCAR", locpot="LOCPOT"):
         self.poscar = poscar
         self.outcar = outcar
         self.locpot = locpot
 
-    @property
-    def get_electrostatic_plot(self):
-        """
-        A function to generate a plot of the planar-averaged electrostatic potential.
-        <Returns>: Nothing, but generates a pdf plot of the averaged electrostatic potential as a function of z-position
-        <Type>: pdf file
-        """
-        return self._calc_electrostatic_plot()
+    def get_electrostatic_potential(self):
+        #Plot the electrostatic potential and save to a file
+        pyplot.figure(figsize=(8,6), dpi=80)
+        Nx, Ny, Nz, z_coord, LOCPOTdata_column = self._parse_locpot()
+        planaravg, avg_planaravg = self._calc_planaravg()
+        pyplot.plot(z_coord, planaravg)
+        pyplot.xlabel('Z-coordinate (arbitrary units)')
+        pyplot.ylabel('Planar averaged electrostatic potential (eV)')
+        pyplot.title('Electrostatic potential')
+        pyplot.savefig('ElectrostaticPotential.pdf')
 
-    @property
+        #Output the raw ESP data to an excel file
+        excel_file = xlsxwriter.Workbook('Electrostatic_potential_data.xlsx')
+        excel_sheet = excel_file.add_worksheet('ESP data')
+        bold = excel_file.add_format({'bold': True})
+        column_name_dict = {"0" : "Supercell z-coordinate (arb units)", "1" : "Electrostatic potential (eV)"}
+        row = 0
+        for key, value in column_name_dict.iteritems():
+            excel_sheet.write(int(row), int(key), value, bold)
+        row = 1
+        #values_dict = {"0" : z_coord, "1" : planaravg}
+        for index in range(len(z_coord)):
+            excel_sheet.write(int(row), 0, z_coord[index])
+            excel_sheet.write(int(row), 1, planaravg[index])
+            row += 1
+        return planaravg
+
     def get_workfunction(self):
-        """
-        This function returns the calculated work function of both surfaces
-        <Returns>: Calculated work functions of the top and bottom surfaces as floats. Also writes txt files in working
-        directory containing work functions and vacuum levels.
-        <Type>: Float (directly returned values), txt files
-        """
-        (fermi_energy, vacuum_energy_top, vacuum_energy_bot, work_function_top, work_function_bot) = self._calc_workfunction()
-        return (fermi_energy, vacuum_energy_top, vacuum_energy_bot, work_function_top, work_function_bot)
+        fermi_energy = OutcarAnalyzer(self.outcar).get_fermi_energy
+        vacuum_energy_top = self.get_vacuum_energy(surface="Top")
+        vacuum_energy_bottom = self.get_vacuum_energy(surface="Bottom")
+        workfunction_top = vacuum_energy_top-fermi_energy
+        workfunction_bottom = vacuum_energy_bottom-fermi_energy
+        return workfunction_top, workfunction_bottom
 
-    @property
+    def get_vacuum_energy(self, surface):
+        Nx, Ny, Nz, z_coord, LOCPOTdata_column = self._parse_locpot()
+        planaravg, avg_planaravg = self._calc_planaravg()
+        # These parameters for finding the values of the vacuum level from each surface seem to work well
+        # This will determine how flat the region needs to be
+        electrostatic_difference_tolerance = 0.05
+        # This determines how many data points for the vacuum level will be averaged together
+        count_tol = 5
+        # This determines how far from the supercell edges to start looking at values and will determine how large of a flat region needs to be present
+        Nz_tol = 10
+
+        vacuum_energy_list = []
+        count = 0
+        # Loop over range of z-coordinate electrostatic potential values
+        if surface == "Top":
+            for index in range(Nz):
+                # Only consider first count_tol values to average electrostatic potential in vacuum region
+                if count < count_tol:
+                    # Only consider Nz values that are Nz-Nz_tol away from top supercell edge and Nz_tol away from bottom supercell edge.
+                    if index < Nz-Nz_tol and index > Nz_tol:
+                        # Only consider electrostatic planaravg values that differ by less than electrostatic_difference_tolerance and are positive.
+                        if abs(planaravg[index+Nz_tol]-planaravg[index-Nz_tol]) < electrostatic_difference_tolerance and planaravg[index] > 0:
+                            vacuum_energy_list.append(planaravg[index])
+                            count += 1
+        elif surface == "Bottom":
+            Nz_reverse = []
+            for index in range(Nz):
+                Nz_reverse.append(Nz-index)
+            for entry in Nz_reverse:
+                if count < count_tol:
+                    if entry < Nz-Nz_tol and entry > Nz_tol:
+                        if abs(planaravg[entry+Nz_tol]-planaravg[entry-Nz_tol]) < electrostatic_difference_tolerance and planaravg[entry] > 0:
+                            vacuum_energy_list.append(planaravg[entry])
+                            count += 1
+        else:
+            raise ValueError('"surface" must be set to either "Top" or "Bottom"')
+
+        sum_vacuum_energy = 0
+        for entry in vacuum_energy_list:
+            sum_vacuum_energy += entry
+
+        # Remove outliers to try to get a more reasonable vacuum level
+        vacuum_energy_top = sum_vacuum_energy/len(vacuum_energy_list)
+        stdev_vac = np.std(vacuum_energy_list)
+        for entry in vacuum_energy_list:
+            if abs(vacuum_energy_top - entry) > stdev_vac:
+                vacuum_energy_list.remove(entry)
+
+        sum_vacuum_energy = 0
+        for entry in vacuum_energy_list:
+            sum_vacuum_energy += entry
+        vacuum_energy = sum_vacuum_energy/len(vacuum_energy_list)
+
+        return vacuum_energy
+
     def get_empirical_delta_workfunction(self):
-        """
-        This function uses the Helmholtz equation to calculate empirically what the change in work function is expected
-        to be based on the value of the dipole present in the VASP calculation.
-        <Returns>: Value of the empirical change in work function of two surfaces due to a dipole, as float
-        <Type>: Float
-        """
-        return self._calc_empirical_delta_workfunction()
+        #Obtain the work function difference between the two surfaces using the Helmholtz equation
+        #This code assumes the surface is oriented in the c-direction, so that a x b is the surface area
+        dipole = OutcarAnalyzer(self.outcar).get_dipole
+        lattice_parameters = PoscarAnalyzer(self.poscar).get_lattice_parameters
+        area = lattice_parameters[0][0]*lattice_parameters[1][1]
+        delta_workfunction = ((-181)*dipole)/area #units of eV, dipole is in eV-Ang, area, in Ang^2
+        return delta_workfunction
 
     def _parse_locpot(self):
         LOCPOT = open(self.locpot, "r")
@@ -193,138 +233,15 @@ class SurfacePotentialAnalyzer(object):
         avg_planaravg = sum_planaravg/Nz
         return planaravg, avg_planaravg
 
-    def _calc_electrostatic_plot(self):
-        #Plot the electrostatic potential and save to a file
-        pyplot.figure(figsize=(8,6), dpi=80)
-        Nx, Ny, Nz, z_coord, LOCPOTdata_column = self._parse_locpot()
-        planaravg, avg_planaravg = self._calc_planaravg()
-        pyplot.plot(z_coord, planaravg)
-        pyplot.xlabel('Z-coordinate (arbitrary units)')
-        pyplot.ylabel('Planar averaged electrostatic potential (eV)')
-        pyplot.title('Electrostatic potential')
-        pyplot.savefig('ElectrostaticPotential.pdf')
-
-        #Output the raw ESP data to an excel file
-        excel_file = xlsxwriter.Workbook('Electrostatic_potential_data.xlsx')
-        excel_sheet = excel_file.add_worksheet('ESP data')
-        bold = excel_file.add_format({'bold': True})
-        column_name_dict = {"0" : "Supercell z-coordinate (arb units)", "1" : "Electrostatic potential (eV)"}
-        row = 0
-        for key, value in column_name_dict.iteritems():
-            excel_sheet.write(int(row), int(key), value, bold)
-        row = 1
-        #values_dict = {"0" : z_coord, "1" : planaravg}
-        for index in range(len(z_coord)):
-            excel_sheet.write(int(row), 0, z_coord[index])
-            excel_sheet.write(int(row), 1, planaravg[index])
-            row += 1
-
-    def _calc_workfunction(self):
-        fermi_energy = OutcarAnalyzer(self.outcar).get_fermi_energy
-        total_atoms = PoscarAnalyzer(self.poscar).get_total_atoms
-        Nx, Ny, Nz, z_coord, LOCPOTdata_column = self._parse_locpot()
-        planaravg, avg_planaravg = self._calc_planaravg()
-
-        ################################################################################################################
-        # Find the vacuum level of the top surface of the slab
-        ################################################################################################################
-
-        # These parameters for finding the values of the vacuum level from each surface seem to work well
-
-        # This will determine how flat the region needs to be
-        electrostatic_difference_tolerance = 0.05
-        # This determines how many data points for the vacuum level will be averaged together
-        count_tol = 5
-        # This determines how far from the supercell edges to start looking at values and will determine how large of a flat region needs to be present
-        Nz_tol = 10
-
-        vacuum_energy_list_top = []
-        count = 0
-        # Loop over range of z-coordinate electrostatic potential values
-        for index in range(Nz):
-            # Only consider first count_tol values to average electrostatic potential in vacuum region
-            if count < count_tol:
-                # Only consider Nz values that are Nz-Nz_tol away from top supercell edge and Nz_tol away from bottom supercell edge.
-                if index < Nz-Nz_tol and index > Nz_tol:
-                    # Only consider electrostatic planaravg values that differ by less than electrostatic_difference_tolerance and are positive.
-                    if abs(planaravg[index+Nz_tol]-planaravg[index-Nz_tol]) < electrostatic_difference_tolerance and planaravg[index] > 0:
-                        vacuum_energy_list_top.append(planaravg[index])
-                        count += 1
-
-        sum_vacuum_energy = 0
-        for entry in vacuum_energy_list_top:
-            sum_vacuum_energy += entry
-
-        vacuum_energy_top = sum_vacuum_energy/len(vacuum_energy_list_top)
-        stdev_top_vac = np.std(vacuum_energy_list_top)
-        for entry in vacuum_energy_list_top:
-            if abs(vacuum_energy_top - entry) > stdev_top_vac:
-                vacuum_energy_list_top.remove(entry)
-
-        sum_vacuum_energy = 0
-        for entry in vacuum_energy_list_top:
-            sum_vacuum_energy += entry
-        vacuum_energy_top = sum_vacuum_energy/len(vacuum_energy_list_top)
-
-        ################################################################################################################
-        #Find the vacuum level of the bottom surface of the slab
-        ################################################################################################################
-
-        electrostatic_difference_tolerance = 0.05
-        count = 0
-        count_tol = 5
-        Nz_tol = 10
-        vacuum_energy_list_bot = []
-        Nz_reverse = []
-        for index in range(Nz):
-            Nz_reverse.append(Nz-index)
-
-        for entry in Nz_reverse:
-            if count < count_tol:
-                if entry < Nz-Nz_tol and entry > Nz_tol:
-                    if abs(planaravg[entry+Nz_tol]-planaravg[entry-Nz_tol]) < electrostatic_difference_tolerance and planaravg[entry] > 0:
-                        vacuum_energy_list_bot.append(planaravg[entry])
-                        count += 1
-
-        sum_vacuum_energy = 0
-        for entry in vacuum_energy_list_bot:
-            sum_vacuum_energy += entry
-
-        vacuum_energy_bot = sum_vacuum_energy/len(vacuum_energy_list_bot)
-        stdev_bot_vac = np.std(vacuum_energy_list_bot)
-        for entry in vacuum_energy_list_bot:
-            if abs(vacuum_energy_bot - entry) > stdev_bot_vac:
-                vacuum_energy_list_bot.remove(entry)
-
-        sum_vacuum_energy = 0
-        for entry in vacuum_energy_list_bot:
-            sum_vacuum_energy += entry
-        vacuum_energy_bot = sum_vacuum_energy/len(vacuum_energy_list_bot)
-
-        # Get work functions from vacuum energies and fermi energy
-        work_function_top = vacuum_energy_top-fermi_energy
-        work_function_bot = vacuum_energy_bot-fermi_energy
-
-        return fermi_energy, vacuum_energy_top, vacuum_energy_bot, work_function_top, work_function_bot
-
-    def _calc_empirical_delta_workfunction(self):
-        #Obtain the work function difference between the two surfaces using the Helmholtz equation
-        #This code assumes the surface is oriented in the c-direction, so that a x b is the surface area
-        dipole = OutcarAnalyzer(self.outcar).get_dipole
-        lattice_parameters = PoscarAnalyzer(self.poscar).get_lattice_parameters
-        area = lattice_parameters[0][0]*lattice_parameters[1][1]
-        delta_workfunction = ((-181)*dipole)/area #units of eV, dipole is in eV-Ang, area, in Ang^2
-        return delta_workfunction
-
 class AIMDAnalyzer(object):
-    """
-    This class analyzes the output of Ab Initio Molecular Dynamics (AIMD) runs in order to calculate and plot the
-    mean-squared displacement (MSD) and calculate the diffusivity components and total diffusivity of a given element.
-    <Args>:
-        xdatcar: (str) The name of an XDATCAR file
+    """This class wraps to the pymatgen tools to analyze the output of Ab Initio Molecular Dynamics (AIMD) runs in order
+    to calculate and plot the mean-squared displacement (MSD) and calculate the diffusivity components and total
+    diffusivity of a given element.
+    args:
         diffusing_species: (str) The name of the element to calculate the diffusion coefficient of
         temperature: (int) The temperature (in K) of the AIMD simulation
         timestep: (int) The timestep (in femtoseconds) of the AIMD simulation
+        xdatcar: (str) The name of an XDATCAR file
         plot_msd: (bool) Whether or not to plot the MSD.
 
         **It is advised that the following variables be left as their default values, but if you change them be sure to
@@ -338,13 +255,12 @@ class AIMDAnalyzer(object):
             observations to have before data are included in the MSD calculation. The suggested default is 30.
         avg_nsteps: (int) This is only used if smoothing = "constant". This determines how many timesteps are averaged over
             when iterating over each timestep. The suggested default is 1000.
-    <Example usage>:
+    example usage:
         diff = AIMDAnalyzer(xdatcar="XDATCAR", diffusing_species="O", temperature=1000, timestep=2)
         diff.get_diffusion_analysis
     """
-    def __init__(self, xdatcar, diffusing_species, temperature, timestep, steps_to_ignore=100,
+    def __init__(self, diffusing_species, temperature, timestep, xdatcar="XDATCAR", steps_to_ignore=100,
       smoothing="max", min_obs=30, avg_nsteps=1000, plot_msd=True, loop_directories=False):
-        self.xdatcar = xdatcar
         self.diffusing_species = diffusing_species
         self.temperature = temperature
         self.timestep = timestep
@@ -354,35 +270,9 @@ class AIMDAnalyzer(object):
         self.avg_nsteps = avg_nsteps
         self.plot_msd = plot_msd
         self.loop_directories = loop_directories
+        self.xdatcar = xdatcar
 
-    @property
-    def get_diffusion_analysis(self):
-        """
-        This function obtains the diffusion coefficients for the specified species. Also produces a plot of the MSD
-        if plot_msd=True.
-        <Returns>: A dictionary of output data containing the diffusion coefficients and conductivities. If plot_msd=True,
-            also produces a pdf file plot in the working directory.
-        """
-        return self._calc_diffusion_from_xdatcars()
-
-    def _prepare_xdatcar_from_dirs(self):
-        structure_list = []
-        myxdatcar = Xdatcar(self.xdatcar)
-        structure_list.extend(myxdatcar.structures)
-        count = 0
-        print "Removing %i initial structures from structure list." % self.steps_to_ignore
-        while count < self.steps_to_ignore:
-            structure_list.pop(0)
-            count += 1
-        print "%i structures left to analyze." % len(structure_list)
-        print "Running diffusion analyzer."
-        structures = open("structurelist.txt", "w")
-        structures.write(str(structure_list))
-        structures.close()
-
-        return structure_list
-
-    def _calc_diffusion_from_xdatcars(self):
+    def get_diffusion_analysis_from_xdatcars(self):
         structure_list = self._prepare_xdatcar_from_dirs()
         diffusion_analysis = DiffusionAnalyzer.from_structures(structures = structure_list, specie = str(self.diffusing_species),
             temperature = float(self.temperature), time_step = int(self.timestep), step_skip = 1, #Don't change this
@@ -408,89 +298,45 @@ class AIMDAnalyzer(object):
         print "Specie %s, temp %3.3fK, timestep %i fs, skipping %i initial structures, smoothing %s with min_obs of %i and avg_nsteps of %i" % (self.diffusing_species, self.temperature, self.timestep, self.steps_to_ignore, self.smoothing, self.min_obs, self.avg_nsteps)
         return outputdict
 
-class DOSAnalyzer(object):
-    """
-    This class is used to obtain plots of projected and total densities of states, and also to obtain useful
+    def _prepare_xdatcar_from_dirs(self):
+        structure_list = []
+        myxdatcar = Xdatcar(self.xdatcar)
+        structure_list.extend(myxdatcar.structures)
+        count = 0
+        print "Removing %i initial structures from structure list." % self.steps_to_ignore
+        while count < self.steps_to_ignore:
+            structure_list.pop(0)
+            count += 1
+        print "%i structures left to analyze." % len(structure_list)
+        print "Running diffusion analyzer."
+        structures = open("structurelist.txt", "w")
+        structures.write(str(structure_list))
+        structures.close()
+        return structure_list
+
+class DoscarAnalyzer(object):
+    """This class is used to obtain plots of projected and total densities of states, and also to obtain useful
     electronic structure quantities from the DOS data, such as bandgap and band centers (centroid of projected DOS for
     certain elements).
-    <Args>:
+    args:
         poscar: (str) the name of a POSCAR file
         incar: (str) the name of an INCAR file
         outcar: (str) the name of an OUTCAR file
         doscar: (str) the name of a DOSCAR file
         energy_cutoff: (float) A user-specified cutoff energy to select a special energy for band center calculations.
             Typically you won't use this input flag.
-    <Example usage>:
+    example usage:
         dos = DOSAnalyzer(poscar="POSCAR", incar="INCAR", outcar="OUTCAR", doscar="DOSCAR")
         dos.get_projected_dos_plot #Plot the projected DOS
         dos.get_bandcenters #Obtain the bandcenters for each element
         dos.get_bandgap_from_outcar #Get the bandgap of the simulated structure
     """
-    def __init__(self, poscar, incar, outcar, doscar, energy_cutoff=0):
+    def __init__(self, poscar="POSCAR", incar="INCAR", outcar="OUTCAR", doscar="DOSCAR", energy_cutoff=0):
         self.poscar = poscar
         self.incar = incar
         self.outcar = outcar
         self.doscar = doscar
         self.energy_cutoff = energy_cutoff
-
-    @property
-    def get_total_dos_plot(self):
-        """
-        Creates a plot of the total DOS
-        <Returns>: Nothing, but creates a pdf file with the total DOS plot in the working directory
-        <Type>: pdf file
-        """
-        return self._plot_total_dos()
-
-    @property
-    def get_projected_dos_plot(self):
-        """
-        Creates a plot of the projected DOS
-        <Returns>: Nothing, but creates a pdf file with the projected DOS plot in the working directory
-        <Type>: pdf file
-        """
-        return self._analyze_projected_dos(get_band_centers=False, save_plot=True)
-
-    @property
-    def get_bandcenters(self):
-        """
-        Calculates the band centers for each element
-        <Returns>: A dictionary containing {Element_orbital : band_center} values. The band centers are in units of eV
-        and are referenced to the Fermi level.
-        <Type>: dict
-        """
-        return self._analyze_projected_dos(get_band_centers=True, save_plot=False)
-
-    @property
-    def get_bandgap_from_dos(self):
-        """
-        Calculates the band gap of the material from DOS data in the DOSCAR file
-        <Returns>: The value of the bandgap as float
-        <Type>: float
-        """
-        return self._calc_bandgap_from_dos()
-
-    @property
-    def get_bandgap_from_outcar(self):
-        """
-        Calculates the band gap of the material from the OUTCAR file
-        <Returns>: The value of the bandgap as float
-        <Type>: float
-        """
-        return self._calc_bandgap_from_outcar()
-
-    @property
-    def get_chgtransgap(self):
-        """
-        Calculates the oxygen charge transfer gap of the material. Only viable if O is in the element list.
-        <Returns>: The value of the charge transfer gap as float
-        <Type>: float
-        """
-        return self._calc_chgtransgap()
-
-    @property
-    def get_effective_dos(self):
-        return self._calc_effective_dos()
 
     def _calc_nedos(self):
         # Obtain the value of NEDOS from INCAR file
@@ -823,56 +669,6 @@ class DOSAnalyzer(object):
 
         print "The bandgap of this material from DOS is %s eV" % (Egap)
         bandgapfile = open("bandgap.txt", "w")
-        Egap = str(Egap)
-        bandgapfile.write(Egap)
-        bandgapfile.close()
-        return Egap
-
-    def _calc_bandgap_from_outcar(self):
-        fermi = OutcarAnalyzer(self.outcar).get_fermi_energy
-        outcar = open(str(self.outcar), "r")
-        outcar_data = outcar.readlines()
-
-        # Get number of kpoints and number of bands, needed for eigenvalue looping
-        # Find eigenvalue list of last ionic iteration
-        for line_number, line in enumerate(outcar_data):
-            if "NKPTS" in line and "NBANDS" in line:
-                nkpts = int(line.split()[3])
-                nbands = int(line.split()[14])
-            if " E-fermi :   %s" % (str(fermi)) in line or " E-fermi :  %s" % (str(fermi)) in line:
-                eigenvalue_list_start = line_number
-
-        VBM_list_perkpt = []
-        CBM_list_perkpt = []
-        for line_number, line in enumerate(outcar_data):
-            if line_number >= eigenvalue_list_start:
-                if "spin component" in line:
-                    # Start the kpt count at 0 for each spin component
-                    kpt_count = 0
-                if "band No." in line:
-                    band_numbers = []
-                    energies = []
-                    occupancies = []
-                    VBM_list = []
-                    CBM_list = []
-                    for band in range(nbands):
-                        eigenvalue = outcar_data[line_number+band+1]
-                        band_numbers.append(float(eigenvalue.split()[0]))
-                        energies.append(float(eigenvalue.split()[1]))
-                        occupancies.append(float(eigenvalue.split()[2]))
-                    for index_energies, index_occupancies in zip(range(len(energies)), range(len(occupancies))):
-                        if occupancies[index_occupancies] > 0:
-                            VBM_list.append(energies[index_occupancies])
-                        elif occupancies[index_occupancies] == 0:
-                            CBM_list.append(energies[index_occupancies])
-                    VBM_list_perkpt.append(max(VBM_list))
-                    CBM_list_perkpt.append(min(CBM_list))
-                    kpt_count += 1
-        VBM = max(VBM_list_perkpt)
-        CBM = min(CBM_list_perkpt)
-        Egap = CBM-VBM
-        print "The bandgap of this material from OUTCAR is %s eV" % (Egap)
-        bandgapfile = open("bandgap_fromoutcar.txt", "w")
         Egap = str(Egap)
         bandgapfile.write(Egap)
         bandgapfile.close()

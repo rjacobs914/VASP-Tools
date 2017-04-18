@@ -208,6 +208,56 @@ class OutcarAnalyzer(object):
         dipole = float(dipole_datalist[-1][-1])
         return dipole
 
+    def get_bandgap(self):
+        fermi = self.get_fermi_energy()
+        outcar = open(str(self.outcar), "r")
+        outcar_data = outcar.readlines()
+
+        # Get number of kpoints and number of bands, needed for eigenvalue looping
+        # Find eigenvalue list of last ionic iteration
+        for line_number, line in enumerate(outcar_data):
+            if "NKPTS" in line and "NBANDS" in line:
+                nkpts = int(line.split()[3])
+                nbands = int(line.split()[14])
+            if " E-fermi :   %s" % (str(fermi)) in line or " E-fermi :  %s" % (str(fermi)) in line:
+                eigenvalue_list_start = line_number
+
+        VBM_list_perkpt = []
+        CBM_list_perkpt = []
+        for line_number, line in enumerate(outcar_data):
+            if line_number >= eigenvalue_list_start:
+                if "spin component" in line:
+                    # Start the kpt count at 0 for each spin component
+                    kpt_count = 0
+                if "band No." in line:
+                    band_numbers = []
+                    energies = []
+                    occupancies = []
+                    VBM_list = []
+                    CBM_list = []
+                    for band in range(nbands):
+                        eigenvalue = outcar_data[line_number + band + 1]
+                        band_numbers.append(float(eigenvalue.split()[0]))
+                        energies.append(float(eigenvalue.split()[1]))
+                        occupancies.append(float(eigenvalue.split()[2]))
+                    for index_energies, index_occupancies in zip(range(len(energies)), range(len(occupancies))):
+                        if occupancies[index_occupancies] > 0:
+                            VBM_list.append(energies[index_occupancies])
+                        elif occupancies[index_occupancies] == 0:
+                            CBM_list.append(energies[index_occupancies])
+                    VBM_list_perkpt.append(max(VBM_list))
+                    CBM_list_perkpt.append(min(CBM_list))
+                    kpt_count += 1
+        VBM = max(VBM_list_perkpt)
+        CBM = min(CBM_list_perkpt)
+        Egap = CBM - VBM
+        #print "The bandgap of this material from OUTCAR is %s eV" % (Egap)
+        bandgapfile = open("bandgap_fromoutcar.txt", "w")
+        Egap = str(Egap)
+        bandgapfile.write(Egap)
+        bandgapfile.close()
+        return Egap
+
 class OszicarAnalyzer(object):
     """
     This class is used to obtain basic, useful quantities from the OSZICAR file.
@@ -554,15 +604,17 @@ class JobAnalyzer(object):
             # Eliminate directories that were not updated within the update_time_cutoff cutoff
             # Eliminating directories updated in different year
             if value[0] != current_time_data[0]:
-                # Eliminate directories updated more than update_time_cutoff ago
-                if abs(value[2] - current_time_data[2]) > (update_time_cutoff / 24):
-                    old_job_dirs.append(key)
+                old_job_dirs.append(key)
+
             # If directory updated within value specified by update_time_cutoff, add to current directory list
             # Ensuring directory updated on same year, then check day cutoff, then hour cutoff
-            if value[0] == current_time_data[0]:
+            elif value[0] == current_time_data[0]:
                 if abs(value[2] - current_time_data[2]) <= (update_time_cutoff / 24):
                     if abs((value[3] - current_time_data[3]) * 24) <= update_time_cutoff:
                         current_job_dirs.append(key)
+                # Eliminate directories updated more than update_time_cutoff ago
+                if abs(value[2] - current_time_data[2]) > (update_time_cutoff / 24):
+                    old_job_dirs.append(key)
 
         return nonstarted_job_dirs, old_job_dirs, current_job_dirs
 
@@ -584,7 +636,8 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
             crashed_jobs_file.write("The following jobs crashed and require further attention" + "\n")
             crashed_jobs_file.write("\n")
             for directory in crashed_job_dirs:
-                crashed_jobs_file.write(str(directory)+"\n")
+                if directory not in old_job_dirs:
+                    crashed_jobs_file.write(str(directory)+"\n")
             crashed_jobs_file.close()
 
         # Write directories of newly submitted jobs to separate file so they can be easily found, only if newly submitted jobs exist
@@ -604,7 +657,8 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
 
         job_status_report_file.write("The following directories contain jobs that crashed:" + "\n")
         for entry in crashed_job_dirs:
-            job_status_report_file.write(str(entry)+"\n")
+            if entry not in old_job_dirs:
+                job_status_report_file.write(str(entry)+"\n")
         if len(crashed_job_dirs)==0:
             job_status_report_file.write("(There are no jobs that were found to have crashed)" + "\n")
 
@@ -624,9 +678,10 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
                 job_status_report_file.write("(There are no jobs that were found to be incomplete)" + "\n")
 
         job_status_report_file.write("\n")
-        job_status_report_file.write("The following directories contain jobs that completed:" + "\n")
+        job_status_report_file.write("The following directories contain jobs that recently completed:" + "\n")
         for entry in completed_job_dirs:
-            job_status_report_file.write(str(entry)+"\n")
+            if entry not in old_job_dirs:
+                job_status_report_file.write(str(entry)+"\n")
         if len(completed_job_dirs)==0:
             job_status_report_file.write("(There are no jobs that were found to be completed)" + "\n")
 
@@ -678,51 +733,53 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
         return resubmitted_job_dirs
 
     @staticmethod
-    def _submit_nonstarted_jobs(nonstarted_job_dirs):
+    def _submit_nonstarted_jobs(nonstarted_job_dirs, old_job_dirs):
         newsubmitted_job_dirs = []
         for directory in nonstarted_job_dirs:
-            os.chdir(directory)
-            logging.info("Submitting new job from directory %s" % (directory))
-            try:
-                subprocess.Popen(['sbatch', 'submit.sh']).communicate()
-            except(OSError):
-                subprocess.Popen(['qsub', 'submit.sh']).communicate()
-            newsubmitted_job_dirs.append(directory)
+            if directory not in old_job_dirs:
+                os.chdir(directory)
+                logging.info("Submitting new job from directory %s" % (directory))
+                try:
+                    subprocess.Popen(['sbatch', 'submit.sh']).communicate()
+                except(OSError):
+                    subprocess.Popen(['qsub', 'submit.sh']).communicate()
+                newsubmitted_job_dirs.append(directory)
         return newsubmitted_job_dirs
 
     @staticmethod
-    def _resubmit_crashed_jobs(crashed_job_dirs):
+    def _resubmit_crashed_jobs(crashed_job_dirs, old_job_dirs):
         resubmitted_crashed_job_dirs = []
         for directory in crashed_job_dirs:
-            os.chdir(directory)
-            continue_dir = directory+"/"+"continue"
-            try:
-                os.mkdir(continue_dir)
-                shutil.copy("POSCAR", continue_dir)
-                shutil.copy("KPOINTS", continue_dir)
-                shutil.copy("INCAR", continue_dir)
-                shutil.copy("POTCAR", continue_dir)
-                shutil.copy("submit.sh", continue_dir)
-                os.chdir(continue_dir)
-                logging.info("Making new continuation folder and resubmitting the job from directory %s" % (continue_dir))
+            if directory not in old_job_dirs:
+                os.chdir(directory)
+                continue_dir = directory+"/"+"continue"
+                try:
+                    os.mkdir(continue_dir)
+                    shutil.copy("POSCAR", continue_dir)
+                    shutil.copy("KPOINTS", continue_dir)
+                    shutil.copy("INCAR", continue_dir)
+                    shutil.copy("POTCAR", continue_dir)
+                    shutil.copy("submit.sh", continue_dir)
+                    os.chdir(continue_dir)
+                    logging.info("Making new continuation folder and resubmitting the job from directory %s" % (continue_dir))
 
-                # Incar modification for crashed jobs
+                    # Incar modification for crashed jobs
 
-                incartemp = open("INCARtemp", "w")
-                incar = open("INCAR", "r")
-                for line in incar:
-                    if "NELMDL" not in line and "ALGO" not in line:
-                        incartemp.write(line)
-                incartemp.write("ALGO = Damped"+"\n")
-                #incartemp.write("TIME = 0.05"+"\n")
-                incartemp.close()
-                incar.close()
-                shutil.move("INCARtemp", "INCAR")
-                subprocess.Popen(['sbatch', 'submit.sh']).communicate()
-                resubmitted_crashed_job_dirs.append(continue_dir)
+                    incartemp = open("INCARtemp", "w")
+                    incar = open("INCAR", "r")
+                    for line in incar:
+                        if "NELMDL" not in line and "ALGO" not in line:
+                            incartemp.write(line)
+                    incartemp.write("ALGO = Damped"+"\n")
+                    #incartemp.write("TIME = 0.05"+"\n")
+                    incartemp.close()
+                    incar.close()
+                    shutil.move("INCARtemp", "INCAR")
+                    subprocess.Popen(['sbatch', 'submit.sh']).communicate()
+                    resubmitted_crashed_job_dirs.append(continue_dir)
 
-            except(OSError):
-                continue
+                except(OSError):
+                    continue
         return resubmitted_crashed_job_dirs
 
 class VASPDataCollector(object):
