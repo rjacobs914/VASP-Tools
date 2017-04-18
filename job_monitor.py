@@ -36,13 +36,13 @@ def main(resubmit_incomplete_jobs=False, submit_queued_jobs=False, resubmit_cras
         logging.info('You have chosen not to resubmit incomplete jobs')
         resubmitted_jobs = []
     if submit_queued_jobs == bool(True):
-        submitted_new_jobs = jobmonitor._submit_nonstarted_jobs(nonstarted_job_dirs=nonstarted_job_dirs)
+        submitted_new_jobs = jobmonitor._submit_nonstarted_jobs(nonstarted_job_dirs=nonstarted_job_dirs, old_job_dirs=old_job_dirs)
         logging.info('Finished submitting new jobs')
     elif submit_queued_jobs == bool(False):
         logging.info('You have chosen not to submit jobs that have not been started yet')
         submitted_new_jobs = []
     if resubmit_crashed_jobs == bool(True):
-        resubmitted_crashed_jobs = jobmonitor._resubmit_crashed_jobs(crashed_job_dirs=crashed_job_dirs)
+        resubmitted_crashed_jobs = jobmonitor._resubmit_crashed_jobs(crashed_job_dirs=crashed_job_dirs, old_job_dirs=old_job_dirs)
     elif resubmit_crashed_jobs == bool(False):
         logging.info('You have chosen not resubmit jobs that previously crashed')
         resubmitted_crashed_jobs = []
