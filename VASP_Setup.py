@@ -28,7 +28,7 @@ from VASP_Analyzer import PoscarAnalyzer
 
 class KpointsFileSetup(object):
     """Class used to create VASP KPOINTS file.
-    kwargs:
+    args:
         mesh_type : (str) Type of mesh to use for kpoints.
             mesh_type = "Monkhorst-Pack" : MP-type kpt grid
             mesh_type = "Gamma" : Gamma-type kpt grid
@@ -37,9 +37,8 @@ class KpointsFileSetup(object):
             mesh_values = "4 4 4" : This is an example mesh if you're using Monkhorst-Pack or Gamma mesh.
             mesh_values = "50" : This is the kpt density if you're using Auto. Approx values are 50 for insulators,
                 100 for d-band metals. Cut in half if doing HSE runs
-    Example usage:
-        kpt = KpointsFileSetup(mesh_type="Monkhorst-Pack", mesh_value="4 4 4", title="SiO2 kpts")
-        kpt.make_kpoints_file
+    instance methods:
+        write_kpoints_file : (None) Writes the KPOINTS file to current directory
     """
 
     def __init__(self, mesh_type, mesh_value, title="New kpoints file"):
@@ -68,17 +67,16 @@ class KpointsFileSetup(object):
         return None
 
 class PotcarFileSetup(object):
-    """This class is used to create a VASP POTCAR file, using elements designated in an
+    """Class used to create a VASP POTCAR file, using elements designated in an
     existing POSCAR file.
-    kwargs:
+    args:
         psp_type : (str) Type of pseudopotentials to be used in the VASP calculation
             psp_type = "PBE": pbe-type pseudopotentials. These are required if conducting phase stability analysis
                 of if conducting HSE-type calculations.
             psp_type = "PW91": pw91-type pseudopotentials
         poscar : (str) The name of a poscar file. Defaults to "POSCAR"
-    Example usage:
-        ptr = PotcarFileSetup(functional="PBE", poscar="POSCAR")
-        ptr.write_potcar_file
+    instance methods:
+        write_potcar_file : (None) Writes a POTCAR file to current directory
     """
 
     def __init__(self, psp_type, poscar="POSCAR"):
@@ -149,28 +147,32 @@ class PotcarFileSetup(object):
         return potcar_labels_dict
 
 class IncarFileSetup():
-    """This class is used to create a VASP INCAR file.
-    kwargs:
-        run_type : (str) Type of VASP simulation to conduct. See below for choices.
-            run_type = "full_relax": Full volume + ions relax
-            run_type = "ions_relax": Fixed volume relax, but relaxes ions
-            run_type = "static_run": Single iteration, fixed volume and ions
-            run_type = "surface_run": Surface calculation with dipole corrections, local potential data
-        XC_type : (str) Type of exchange-correlation functional used. See below for choices.
-            XC_type = "GGA": Standard GGA
-            XC_type = "GGA+U": GGA with U values for transition metals consistent with Materials Project usage
-            XC_type = "HSE": Hybrid GGA with standard 25% Hartree-Fock mixing
-        number_of_nodes : (int) The number of nodes to use in the VASP calculation
-        poscar : (str) The name of a poscar file
-        material_type : (str) Specify whether the material is a metal or insulator. Affects some tag choices
-            material_type = "metal" : metallic material (use for s- and p- band materials)
-            material_type = "insulator" : insulating material (use for semiconductors, band and Mott insulators, and correlated metals)
-        write_chgcar : (bool) Whether to write the CHGCAR file
-        write_wavecar: (bool) Whether to write the WAVECAR file
-
-    Example usage:
-        inc = IncarFileSetup(run_type="full_relax", XC_type="GGA+U", number_of_nodes=2, poscar="POSCAR")
-        inc.get_incar_file
+    """Class used to create a VASP INCAR file.
+    args:
+        None. See instance methods.
+    instance methods:
+        write_predefined_incar_file : (None) Writes an INCAR file to the current directory using predefined INCAR tags
+            args:
+                simulation_type : (str) Type of VASP simulation to conduct. See below for choices.
+                    run_type = "full_relax": Full volume + ions relax
+                    run_type = "ions_relax": Fixed volume relax, but relaxes ions
+                    run_type = "static_run": Single iteration, fixed volume and ions
+                    run_type = "surface_run": Surface calculation with dipole corrections, local potential data
+                XC_type : (str) Type of exchange-correlation functional used. See below for choices.
+                    XC_type = "GGA": Standard GGA
+                    XC_type = "GGA+U": GGA with U values for transition metals consistent with Materials Project usage
+                    XC_type = "HSE": Hybrid GGA with standard 25% Hartree-Fock mixing
+                number_of_nodes : (int) The number of nodes to use in the VASP calculation
+                disable_symmetry : (bool) Whether to remove symmetry operations from DFT calculation
+                poscar : (str) The name of a poscar file
+                material_type : (str) Specify whether the material is a metal or insulator. Affects some tag choices
+                    material_type = "metal" : metallic material (use for s- and p- band materials)
+                    material_type = "insulator" : insulating material (use for semiconductors, band and Mott insulators, and correlated metals)
+                write_chgcar : (bool) Whether to write the CHGCAR file
+                write_wavecar: (bool) Whether to write the WAVECAR file
+        write_custom_incar_file : (None) Writes an INCAR file to current directory based on user-provided dict of INCAR tags
+            args:
+                incar_dict (dict) A dict of INCAR file tags (keys) and tag values (values)
     """
 
     def __init__(self):
@@ -267,8 +269,8 @@ class IncarFileSetup():
         return incar_dict
 
 class SubmitFileSetup(object):
-    """This class is used to create a cluster submission script for VASP runs.
-    kwargs:
+    """Class used to create a cluster submission script for VASP runs.
+    args:
         cluster : (str) The name of the computing cluster to be used for the calculation. Select from:
             cluster = "Turnbull" : run on Turnbull
             cluster = "ACI" : run on UW-Madison ACI
@@ -287,9 +289,8 @@ class SubmitFileSetup(object):
         queue_partition: (str) name of queue partition, currently for Cori only
             queue_partition = "haswell" to use haswell partition
             queue_partition = "knl" to use KNL partition
-    Example usage:
-        sub = SubmitFileSetup(cluster="ACI", queue="morgan", number_of_nodes=2, gamma_point=False)
-        sub.get_submit_file
+    instance methods:
+        write_submit_file (None) Writes a submit.sh file to the current directory
     """
     def __init__(self, cluster, queue, number_of_nodes, gamma_point=False, queue_partition=None):
         self.cluster = cluster
@@ -391,12 +392,13 @@ class SubmitFileSetup(object):
         return None
 
 class PoscarFileSetup(object):
-    """This class is used to create a VASP POSCAR file by fetching structure data from Materials Project
-    kwargs:
-        material : (str) The chemical formula of the material to make a POSCAR file
-    Example usage:
-        make_psr = PoscarFileSetup(material="SiO2")
-        make_psr.get_poscar_file
+    """Class used to create a VASP POSCAR file by fetching structure data from Materials Project
+    args:
+        material_composition : (str) The chemical formula of the material to make a POSCAR file
+        mapi_key : (str) Your Materials API key from MaterialsProject.org
+        get_only_most_stable_structure : (bool) Whether to only return most stable structure when querying MaterialsProject
+    instance methods:
+        write_poscar_file : (list of poscar objects) Writes POSCAR file(s) to current directory
     """
     def __init__(self, material_composition, mapi_key, get_only_most_stable_structure=True):
         self.material_composition = material_composition
@@ -470,30 +472,76 @@ class PoscarFileSetup(object):
         return structure_data_list
 
 class PoscarFileModifier(object):
-    """This class is used to perform various useful structural modifications to a basic POSCAR file
-    kwargs:
-        poscar_in : (str) The name of a poscar file to perform modifications on, must be called "POSCAR"
-        poscar_out : (str) The name of the modified poscar file. Only used internally and can be named anything.
-
-    Example usage:
-        mod_psr = PoscarFileModifier(poscar_in="POSCAR", poscar_out="POSCAR_mod")
-        mod_psr.make_poscar_supercell(scaling_matrix=[[0, 0, 1], [0, 1, 0], [0, 0, 3]]) #Making a supercell out of original poscar
-        mod_psr.make_alloyed_poscar_manual(alloying_type="Partial", alloying_scheme={"Ba":{"Sr":0.5, "Mg":0.5},"Fe":"Co"},
-            oxidation_states={"Ba":2, "Sr":2, "Mg":2, "Fe":4, "Co":4, "O":-2}) #Alloying the supercell
-        mod_psr.make_poscar_slab(hkl="[0, 0, 1]", min_thick=20, min_vac=15) #Making a (001) surface out of the alloyed supercell
-        mod_psr.selective_dynamics(z_tolerance=0.08) #Adding selective dynamics to the newly made surface slab
+    """Class used to perform various useful structural modifications to a basic POSCAR file
+    args:
+        poscar : (str) Name of a poscar file in current directory
+    instance methods:
+        make_poscar_supercell : (poscar object) Creates a supercell from an existing POSCAR file
+            args:
+                scaling_matrix : (list) A list of three scaling vectors for supercell dimensions, e.g. [[2, 0, 0],[0, 2, 0],[0, 0, 3]]
+        make_poscar_rescaled : (poscar object) Function that rescales the supercell dimensions to incorporate strain, and to also simply rescale the lattice
+            while keeping all atoms fixed at their relative direct coordinates. Useful for creating strained materials,
+            rescaling vacuum dimensions for surfaces or nanoparticles.
+            args:
+                cell_rescale_dict : (dict) A dictionary of cell directions and cell lengths (in Angstroms) pairs to rescale
+                    the cell by, e.g. {"x": 6, "z": 40}. The cell directions must be one of "x", "y" and "z" and the cell
+                    lengths must be in units of Angstroms.
+                is_strained : (bool) Whether to treat the rescaling as a strain (i.e., atom positions are scaled with the
+                    new cell lengths) (is_strained = True) or whether to simply rescale the cell length and keep atom
+                    positions fixed (is_strained = False). Note that this type of rescaling is best for changing the size of
+                    surface cells along the vacuum direction, and some unphysical structure may result when rescaling in
+                    the other directions.
+        make_poscar_with_dopants : (poscar object) This function is used to create an alloyed POSCAR, and more generally
+            to easily change the composition of a POSCAR
+            args:
+                doping_type : (str) Designates rather to do single or multi-site alloying
+                    doping_type = "Full", alloying where one species is converted completely to another species. Can be done on multiple sites
+                    doping_type = "Partial", alloying where one site is converted to multiple species with partial occupancies. Can be done on multiple sites
+                doping_scheme : (dict) A dictionary of species to alloy, see examples below:
+                    if doping_type = "Full", doping_scheme={"Li": "Na", "Cl": "F"} will replace all Li with Na and all Cl with F.
+                    if doping_type = "Partial", doping_scheme={"Li": {"Na": 0.75, "K": 0.25}} will replace Li with 75% Na and 25% K. Note that for determining the ordered
+                        structure with different occupancies, this routine can be computationally expensive.
+                oxidation states : (dict) A dictionary of oxidation states,
+                    if doping_type = "Partial", {"Li":1, "Na":1, "K":1 "O":-2}. Need to supply oxidation states of all elements involved
+        make_poscar_with_vacancy : (list of poscar objects) This function is used to create POSCAR files with each symmetry distinct vacancy, up to a specified supercell size.
+            args:
+                vacancy_species: (list) A list of elemental species to create vacancies, e.g. ["Li", "Co"]
+                max_supercell_size : (list of list) A matrix of the maximum supercell size to generate defected structures.
+                    e.g., [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
+        make_poscar_slab : (poscar object) This function is used to create a surface slab from an existing POSCAR file
+            args:
+                surface_hkl: (list) The miller indices with which to create the surface slab, e.g. [1, 1, 0]
+                minimum_thickness: (int) The minimum thickness of the resulting supercell slab, in the direction of the specified
+                    miller indices hkl.
+                minimum_vacuum: (int) The minimum thickness of the vacuum region, in the direction of the specified miller indices hkl.
+                shift_slab_to_bottom: (bool) Whether to shift the atom coordinates of the slab such that the slab is
+                    positioned at the bottom of the supercell. This can sometimes aid in surface convergence with dipole
+                    corrections.
+        trim_poscar_slab : (poscar object) This function is used to trim the top or bottom layer of atoms from a surface slab.
+            Useful for isolating the desired surface termination if multiple terminations of a single hkl direction are possible.
+            Note to users: this routine may fail for materials containing surfaces where the atom positions vary in the
+            z-direction by more than the value of atom_position_tolerance. You may need to experiment with the value of this
+            parameter to get the desired results. Use carefully!
+            args:
+                surface_trimming_dict: (dict) A dictionary written with keys of "Top" and "Bottom" and values
+                    equal to number of surface layers to trim on each surface. For example, {"Top": 2, "Bottom": 1} will remove the
+                    top two surface layers and bottom one surface layers from the POSCAR.
+                atom_position_tolerance: (float) cutoff distance
+        add_selective_dynamics : (poscar object) This function is used to add selective dynamics tags of 'T T T' and
+            'F F F' to surface atoms. Generally, one wants to relax the top and bottom couple layers, and freeze the
+            remaining atoms in the slab to be bulk-like.
+            args:
+                number_of_layers : (int) The number of layers from the surface to designate as 'T T T', i.e. the number
+                    of layers you want to relax.
+                top_and_bottom : (bool) Whether or not to relax both the top and bottom surfaces. Defaults to True. If set
+                    to False, only the top layer is relaxed.
+                layer_thickness : (float) Surface layer thickness, in angstroms. A typical value is 2, which is set as default.
     """
     def __init__(self, poscar="POSCAR"):
         self.poscar = poscar
         shutil.copy(os.getcwd()+"/"+self.poscar, os.getcwd()+"/"+self.poscar+"_original")
 
     def make_poscar_supercell(self, scaling_matrix):
-        """This function creates a supercell from an input POSCAR file
-        args:
-            scaling_matrix : (list) A list of three scaling vectors for supercell dimensions, e.g. [[2, 0, 0],[0, 2, 0],[0, 0, 3]]
-        returns:
-            poscar: (poscar object)
-        """
         poscar_placeholder = "POSCAR_placeholder"
         structure = Structure.from_file(self.poscar)
         structure_scaled = SupercellTransformation(scaling_matrix).apply_transformation(structure)
@@ -503,21 +551,6 @@ class PoscarFileModifier(object):
         return poscar
 
     def make_poscar_rescaled(self, cell_rescale_dict, is_strained=False):
-        """This function rescales the supercell dimensions to incorporate strain, and to also simply rescale the lattice
-        while keeping all atoms fixed at their relative direct coordinates. Useful for creating strained materials,
-        rescaling vacuum dimensions for surfaces or nanoparticles.
-        args:
-            cell_rescale_dict : (dict) A dictionary of cell directions and cell lengths (in Angstroms) pairs to rescale
-                the cell by, e.g. {"x": 6, "z": 40}. The cell directions must be one of "x", "y" and "z" and the cell
-                lengths must be in units of Angstroms.
-            is_strained : (bool) Whether to treat the rescaling as a strain (i.e., atom positions are scaled with the
-                new cell lengths) (is_strained = True) or whether to simply rescale the cell length and keep atom
-                positions fixed (is_strained = False). Note that this type of rescaling is best for changing the size of
-                surface cells along the vacuum direction, and some unphysical structure may result when rescaling in
-                the other directions.
-        returns:
-            poscar: (poscar object)
-        """
         psr = PoscarAnalyzer(poscar=self.poscar)
         lattice_parameters = psr.get_lattice_parameters
         atom_positions = psr.get_atom_positions_direct
@@ -591,20 +624,6 @@ class PoscarFileModifier(object):
         return poscar
 
     def make_poscar_with_dopants(self, doping_type, doping_scheme, oxidation_states=None):
-        '''This function is used to create an alloyed POSCAR, and more generally to easily change the composition of a POSCAR
-        args:
-            doping_type : (str) Designates rather to do single or multi-site alloying
-                doping_type = "Full", alloying where one species is converted completely to another species. Can be done on multiple sites
-                doping_type = "Partial", alloying where one site is converted to multiple species with partial occupancies. Can be done on multiple sites
-            doping_scheme : (dict) A dictionary of species to alloy, see examples below:
-                if doping_type = "Full", doping_scheme={"Li": "Na", "Cl": "F"} will replace all Li with Na and all Cl with F.
-                if doping_type = "Partial", doping_scheme={"Li": {"Na": 0.75, "K": 0.25}} will replace Li with 75% Na and 25% K. Note that for determining the ordered
-                    structure with different occupancies, this routine can be computationally expensive.
-            oxidation states : (dict) A dictionary of oxidation states,
-                if doping_type = "Partial", {"Li":1, "Na":1, "K":1 "O":-2}. Need to supply oxidation states of all elements involved
-        returns:
-            poscar: (poscar object)
-        '''
         structure = Structure.from_file(self.poscar)
         poscar_placeholder = "POSCAR_placeholder"
         if doping_type == "Full":
@@ -624,14 +643,6 @@ class PoscarFileModifier(object):
         return poscar
 
     def make_poscar_with_vacancy(self, vacancy_species, max_supercell_size):
-        '''This function is used to create POSCAR files with each symmetry distinct vacancy, up to a specified supercell size.
-        args:
-            vacancy_species: (list) A list of elemental species to create vacancies, e.g. ["Li", "Co"]
-            max_supercell_size : (list of list) A matrix of the maximum supercell size to generate defected structures.
-                e.g., [[2, 0, 0], [0, 2, 0], [0, 0, 2]]
-        returns:
-            poscar_list: (list) A list of poscar objects
-        '''
         element_names = PoscarAnalyzer(poscar=self.poscar).get_element_names
         count = 1
         structure = Structure.from_file(self.poscar)
@@ -651,35 +662,7 @@ class PoscarFileModifier(object):
             count += 1
         return poscar_list
 
-    """
-    def make_poscar_with_interstitial(self, interstitial_species, max_supercell_size):
-        count = 1
-        structure = Structure.from_file(self.poscar)
-        poscar_list = []
-
-        for element in interstitial_species:
-            int = InterstitialTransformation(supercell_dim=max_supercell_size, interstitial_specie=element)
-            structure_with_ints = int.apply_transformation(structure=structure, return_ranked_list=True)
-            poscar = Poscar(structure=structure_with_ints[0]["structure"])
-            poscar_list.append(poscar)
-            poscar.write_file("POSCAR"+"_"+str(element)+str(count))
-            count += 1
-        return poscar_list
-    """
-
     def make_poscar_slab(self, surface_hkl, minimum_thickness, minimum_vacuum=20, shift_slab_to_bottom=True):
-        """This function is used to create a surface slab from an existing POSCAR file
-        args:
-            surface_hkl: (list) The miller indices with which to create the surface slab, e.g. [1, 1, 0]
-            minimum_thickness: (int) The minimum thickness of the resulting supercell slab, in the direction of the specified
-                miller indices hkl.
-            minimum_vacuum: (int) The minimum thickness of the vacuum region, in the direction of the specified miller indices hkl.
-            shift_cell_to_bottom: (bool) Whether to shift the atom coordinates of the slab such that the slab is
-                positioned at the bottom of the supercell. This can sometimes aid in surface convergence with dipole
-                corrections.
-        returns:
-            poscar: (poscar object)
-        """
         bulk_structure = Structure.from_file(self.poscar)
         interface = Interface(bulk_structure, hkl=surface_hkl, min_thick=minimum_thickness, min_vac=minimum_vacuum,
                               primitive=False, from_ase=True)
@@ -723,23 +706,7 @@ class PoscarFileModifier(object):
 
         return poscar
 
-    def trim_poscar_slab(self, surface_trimming_dict = {"Top": 0, "Bottom": 0}, atom_position_tolerance = 0.01):
-        '''This function is used to trim the top or bottom layer of atoms from a surface slab. Useful for isolating the
-        desired surface termination if multiple terminations of a single hkl direction are possible.
-
-        Note to users: this routine may fail for materials containing surfaces where the atom positions vary in the
-        z-direction by more than the value of atom_position_tolerance. You may need to experiment with the value of this
-        parameter to get the desired results. Use carefully!
-
-        args:
-            surface_trimming_dict: (dict) A dictionary written with keys of "Top" and "Bottom" and values
-                equal to number of surface layers to trim on each surface. For example, {"Top": 2, "Bottom": 1} will remove the
-                top two surface layers and bottom one surface layers from the POSCAR.
-            atom_position_tolerance: (float) cutoff distance
-        returns:
-            poscar: (poscar object)
-        '''
-
+    def trim_poscar_slab(self, surface_trimming_dict, atom_position_tolerance = 0.01):
         # Loop through top and bottom components of dict, separately removing the top and bottom layers
         for key in surface_trimming_dict.keys():
             surface_layer_count = 0
@@ -825,17 +792,6 @@ class PoscarFileModifier(object):
         return poscar
 
     def add_selective_dynamics(self, number_of_layers, top_and_bottom = True, layer_thickness=2.0):
-        """This function is used to add selective dynamics tags of 'T T T' and 'F F F' to surface atoms. Generally, one
-        wants to relax the top and bottom couple layers, and freeze the remaining atoms in the slab to be bulk-like.
-        args:
-            number_of_layers : (int) The number of layers from the surface to designate as 'T T T', i.e. the number
-                of layers you want to relax.
-            top_and_bottom : (bool) Whether or not to relax both the top and bottom surfaces. Defaults to True. If set
-                to False, only the top layer is relaxed.
-            layer_thickness : (float) Surface layer thickness, in angstroms. A typical value is 2, which is set as default.
-        returns:
-            poscar object
-        """
         #Typically a z_tolerance equal to 0.5*layer_spacing - delta will make a single layer marked "T T T".
         pa = PoscarAnalyzer(poscar=self.poscar)
         lattice_parameters = pa.get_lattice_parameters
@@ -905,7 +861,11 @@ class PoscarFileModifier(object):
         return poscar
 
 class JobSubmission():
-
+    """Class used to submit vasp jobs
+    args: None
+    class methods:
+        submit_job : (None) Submit a VASP job from current directory
+    """
     @classmethod
     def submit_job(cls, directory, submit_file="submit.sh", queue_command="sbatch"):
         os.chdir(directory)
