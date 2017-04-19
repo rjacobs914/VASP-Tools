@@ -62,6 +62,14 @@ class PoscarAnalyzer(object):
             total_atoms += float(atom_amounts[index])
         return total_atoms
 
+    def get_composition_dict(self):
+        composition_dict = {}
+        atom_amounts = self.get_atom_amounts()
+        element_names = self.get_element_names()
+        for element, atom in zip(element_names, atom_amounts):
+            composition_dict[element] = atom
+        return composition_dict
+
     def get_element_composition(self):
         element_composition = []
         total_atoms = self.get_total_atoms
