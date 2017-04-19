@@ -58,7 +58,7 @@ class PoscarAnalyzer(object):
 
     def get_total_atoms(self):
         total_atoms = 0
-        atom_amounts = self.get_atom_amounts
+        atom_amounts = self.get_atom_amounts()
         for index in range(len(atom_amounts)):
             total_atoms += float(atom_amounts[index])
         return total_atoms
@@ -73,8 +73,8 @@ class PoscarAnalyzer(object):
 
     def get_element_composition(self):
         element_composition = []
-        total_atoms = self.get_total_atoms
-        atom_amounts = self.get_atom_amounts
+        total_atoms = self.get_total_atoms()
+        atom_amounts = self.get_atom_amounts()
         for index in range(len(atom_amounts)):
             element_composition.append(float(atom_amounts[index]/total_atoms))
         return element_composition
@@ -100,7 +100,7 @@ class PoscarAnalyzer(object):
         return lattice_parameters
 
     def get_cell_volume(self):
-        lattice_parameters = self.get_lattice_parameters
+        lattice_parameters = self.get_lattice_parameters()
         lattice_parameters_x = lattice_parameters[0][0]
         lattice_parameters_y = lattice_parameters[1][1]
         lattice_parameters_z = lattice_parameters[2][2]
@@ -108,13 +108,13 @@ class PoscarAnalyzer(object):
         return cell_volume
 
     def get_atom_positions_direct(self):
-        atom_positions = []; atom_positions_split = []; atom_positions_split_float_x = []; atom_positions_split_float_y = [];
+        atom_positions = []; atom_positions_split = []; atom_positions_split_float_x = []; atom_positions_split_float_y = []
         atom_positions_split_float_z = []; atom_positions_array = np.empty((0,1)); atom_positions_array_x = np.empty((0,1)); atom_positions_array_y = np.empty((0,1))
-        atom_positions_array_z = np.empty((0,1));
+        atom_positions_array_z = np.empty((0,1))
 
         poscar = open(self.poscar, "r")
         poscar_data = poscar.readlines()
-        total_atoms = self.get_total_atoms
+        total_atoms = self.get_total_atoms()
 
         atom_position_start = 7
         atom_position_end = 8
@@ -145,11 +145,11 @@ class PoscarAnalyzer(object):
         return atom_positions_array
 
     def get_atom_positions_cartesian(self):
-        x_coords_cart = []; y_coords_cart = []; z_coords_cart = [];
-        atom_positions_array_x = np.empty((0,1)); atom_positions_array_y = np.empty((0,1)); atom_positions_array_z = np.empty((0,1));
+        x_coords_cart = []; y_coords_cart = []; z_coords_cart = []
+        atom_positions_array_x = np.empty((0,1)); atom_positions_array_y = np.empty((0,1)); atom_positions_array_z = np.empty((0,1))
 
-        atom_positions_array = self.get_atom_positions_direct
-        lattice_parameters = self.get_lattice_parameters
+        atom_positions_array = self.get_atom_positions_direct()
+        lattice_parameters = self.get_lattice_parameters()
 
         for index in range(len(atom_positions_array[0])):
             x_coords_cart.append(atom_positions_array[0][index]*lattice_parameters[0][0]+atom_positions_array[1][index]*lattice_parameters[0][1]+atom_positions_array[2][index]*lattice_parameters[0][2])
@@ -172,6 +172,8 @@ class OutcarAnalyzer(object):
         get_fermi_energy: (float) returns the Fermi energy of the final ionic iteration of VASP run
         get_dipole : (float) returns the dipole moment of the final ionic iteration of VASP run
         get_bandgap : (float) returns the electronic band gap, computed from eigenvalues in OUTCAR
+        get_magnetization_per_atom : (dict) returns a dict of {atom number : total_magnetization}, that is, the total
+            magnetization (sum of s, p, d, and f) for each atom in the POSCAR file
     """
     def __init__(self, outcar="OUTCAR"):
         self.outcar = outcar
@@ -260,6 +262,29 @@ class OutcarAnalyzer(object):
         bandgapfile.write(Egap)
         bandgapfile.close()
         return Egap
+
+    def get_magnetization_per_atom(self):
+        mag_data_raw = []; mag_data_dict = {}
+        line_counting = False
+        total_atoms = PoscarAnalyzer().get_total_atoms()
+        outcar = open(str(self.outcar), "r")
+        for line in outcar.readlines():
+            if "magnetization (x)" in line:
+                line_count = 0
+                line_counting = True
+            if line_counting == bool(True) and line_count < total_atoms+5:
+                mag_data_raw.append(line.strip())
+                line_count += 1
+        # Only report the last batch of magnetization data, which is for the last ionic iteration
+        max_magnetization_index = 0
+        for index, entry in enumerate(mag_data_raw):
+            if "magnetization" in entry:
+                if index > max_magnetization_index:
+                    max_magnetization_index = index
+        for index, entry in enumerate(mag_data_raw):
+            if index >= max_magnetization_index+4 and index < max_magnetization_index+total_atoms+4:
+                mag_data_dict[int(entry.split()[0])] = float(entry.split()[5])
+        return mag_data_dict
 
 class OszicarAnalyzer(object):
     """Class used to obtain basic, useful quantities from the OSZICAR file.
