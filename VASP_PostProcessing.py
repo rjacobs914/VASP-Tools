@@ -25,8 +25,8 @@ import math
 import numpy as np
 import re
 import os
+import sys
 from scipy import integrate
-import itertools
 import xlsxwriter
 
 class WulffWrapper(object):
@@ -642,7 +642,7 @@ class DoscarAnalyzer(object):
                     nedos = int(entry)
 
         #If no NEDOS is specified in INCAR, use default value of 301
-        if nedos_found == False:
+        if nedos_found == bool(False):
             nedos = int(301)
 
         incar.close()
@@ -652,7 +652,7 @@ class DoscarAnalyzer(object):
         Energy = []
         dosdata, total_dos = self._cleanup_projected_dos()
         nedos = self._calc_nedos()
-        fermi = OutcarAnalyzer(self.outcar).get_fermi_energy
+        fermi = OutcarAnalyzer(self.outcar).get_fermi_energy()
         # Create the list of energies
         count = 0
         for entry in dosdata:
@@ -700,7 +700,7 @@ class DoscarAnalyzer(object):
         doscar = open(self.doscar, "r")
         dosdata = doscar.readlines()
         nedos = self._calc_nedos()
-        number_of_atoms = int(PoscarAnalyzer(self.poscar).get_total_atoms)
+        number_of_atoms = int(PoscarAnalyzer(self.poscar).get_total_atoms())
 
         # Isolate just the total DOS from the DOS data
         total_dos_rows = []
@@ -784,8 +784,8 @@ class DoscarAnalyzer(object):
     def _parse_dos_atom_type(self):
         dosdata = self._parse_dos_orbital_type()
         nedos = self._calc_nedos()
-        atom_amounts = PoscarAnalyzer(self.poscar).get_atom_amounts
-        element_names = PoscarAnalyzer(self.poscar).get_element_names
+        atom_amounts = PoscarAnalyzer(self.poscar).get_atom_amounts()
+        element_names = PoscarAnalyzer(self.poscar).get_element_names()
 
         element_iteration_count = 0
         dos_sum_s_up_list = []
@@ -895,8 +895,6 @@ class DoscarAnalyzer(object):
         total_dos = []
         for index in range(len(total_dos_up_list)):
             total_dos.append(total_dos_up_list[index]+total_dos_down_list[index])
-
-
 
         #Find the position of the VBM
         for index in range(nedos):
@@ -1363,10 +1361,9 @@ class StabilityAnalyzer(object):
         return organic_compositions, organic_energies
 
 class ChemicalPotentialAnalyzer():
-    """
-    A class to calculate the chemical potential of select gaseous species under user-specified environmental conditions
+    """Class used to calculate the chemical potential of select gaseous species under user-specified environmental conditions
     The elements that can have their chemical potential calculated are: O, H, N, F, Cl, Br, I
-    <Args>:
+    args:
         temperature: (int) temperature in K, must be > 0
         pressure: (int) pressure in atm, must be > 0
         functional: (str) DFT XC functional, specify as "PBE" or "PW91". Note that getting mu_H from mu_H2O only works
@@ -1375,14 +1372,18 @@ class ChemicalPotentialAnalyzer():
             acquiring the H chemical potential via equilibrium with H2O.
         energy_shift: (bool) whether to add the energy correction to O energy. Note that for Stability calculations,
             use shift of "False" because MP convention is to apply shift to compounds, not gaseous O.
+        relative_humidity : (float) value of relative humidity, which determines partial pressure of H2O
         pressure_O2_forH2O: (float) value for partial pressure of O2, only for use in getting chem pot of H from H2O. Defaults to
                     0.2 atm, which is the partial pressure of O2 in air.
-    <Example usage>:
-        chempot = ChemicalPotentialAnalyzer(temperature=1000, pressure=10**-6, functional="PBE",
-            energy_shift="False", relative_humidity=1, pressure_O2_forH2O=0.2)
-        Value of O chemical potential: chempot.get_O_chem_pot
-        Value of H chemical potential: chempot.get_H_chem_pot
-        Value of H chemical potential from equilibrium with H2O (RH=1, O2 partial pressure of 0.2 atm): chempot.get_H_chem_pot_fromH2O
+    instance methods:
+        get_O_chem_pot : (float) calculates the O gas chemical potential, enthalpy and entropy
+        get_H_chem_pot : (float) calculates the H gas chemical potential, enthalpy and entropy
+        get_H_chem_pot_fromH2O : (float) calculates the H chemical potential assuming that H2 is in equilibrium with H2O
+        get_N_chem_pot : (float) calculates the N gas chemical potential, enthalpy and entropy
+        get_F_chem_pot : (float) calculates the F gas chemical potential, enthalpy and entropy
+        get_Cl_chem_pot : (float) calculates the Cl gas chemical potential, enthalpy and entropy
+        get_Br_chem_pot : (float) calculates the Br gas chemical potential, enthalpy and entropy
+        get_I_chem_pot : (float) calculates the I gas chemical potential, enthalpy and entropy
     """
     def __init__(self, temperature, pressure, functional, energy_shift=bool(False), relative_humidity=1, pressure_O2_forH2O=0.2):
         self.temperature = temperature
@@ -1392,117 +1393,16 @@ class ChemicalPotentialAnalyzer():
         self.relative_humidity = relative_humidity
         self.pressure_O2_forH2O = pressure_O2_forH2O
 
-    @property
     def get_O_chem_pot(self):
-        """
-        Function to calculate chemical potential of O
-        <Returns>: O chem pot
-        <Type>: float
-        """
-        mu_O, HT_H0, S0 = self._calc_O_chem_pot()
-        return float(mu_O)
-
-    @property
-    def get_H_chem_pot(self):
-        """
-        Function to calculate chemical potential of H from H2 gas
-        <Returns>: H chem pot
-        <Type>: float
-        """
-        mu_H, HT_H0, S0 = self._calc_H_chem_pot()
-        return float(mu_H)
-
-    @property
-    def get_H_chem_pot_fromH2O(self):
-        """
-        Function to calculate chemical potential of H from equilibrium with H2O
-        <Returns>: H chem pot
-        <Type>: float
-        """
-        return self._calc_H_chem_pot_fromH2O()
-
-    @property
-    def get_N_chem_pot(self):
-        """
-        Function to calculate chemical potential of N2
-        <Returns>: N chem pot
-        <Type>: float
-        """
-        mu_N, HT_H0, S0 = self._calc_N_chem_pot()
-        return float(mu_N)
-
-    @property
-    def get_F_chem_pot(self):
-        """
-        Function to calculate chemical potential of F2
-        <Returns>: F chem pot
-        <Type>: float
-        """
-        mu_F, HT_H0, S0 = self._calc_F_chem_pot()
-        return float(mu_F)
-
-    @property
-    def get_Cl_chem_pot(self):
-        """
-        Function to calculate chemical potential of Cl2
-        <Returns>: Cl chem pot
-        <Type>: float
-        """
-        mu_Cl, HT_H0, S0 = self._calc_Cl_chem_pot()
-        return float(mu_Cl)
-
-    @property
-    def get_Br_chem_pot(self):
-        """
-        Function to calculate chemical potential of Br2
-        <Returns>: Br chem pot
-        <Type>: float
-        """
-        mu_Br, HT_H0, S0 = self._calc_Br_chem_pot()
-        return float(mu_Br)
-
-    @property
-    def get_I_chem_pot(self):
-        """
-        Function to calculate chemical potential of I2
-        <Returns>: I chem pot
-        <Type>: float
-        """
-        mu_I, HT_H0, S0 = self._calc_I_chem_pot()
-        return float(mu_I)
-
-    def _check_input(self):
-        func_list = ["pw91", "PW91", "PBE", "pbe"]
-        if self.temperature <= 0:
-            print "ERROR: You have selected on a nonsensical temperature. Exiting..."
-            exit()
-        if self.pressure <= 0:
-            print "ERROR: You have selected on a nonsensical pressure. Exiting..."
-            exit()
-        if self.functional not in func_list:
-            print "ERROR: You must specify one of either PW91 or PBE functionals. Exiting..."
-            exit()
-        #if self.energy_shift == "True":
-        #    print "Applying the shift corrections"
-        #if self.energy_shift == "False":
-        #    print "No shift corrections made"
-
-    def _calc_O_chem_pot(self):
-
         self._check_input()
-
         k = 8.61733*10**-5 #Boltzmann's constant in eV/K
         P0 = 1 #standard pressure in atm
         O_shift_PBE = 2*0.7023
         O_shift_PW91 = 2*0.165
         conv = 1.60217662*10**-19 #J per eV
         Nav = 6.0221409*10**23 #Avogadro's number
-        #EO2_PBE = -9.313 #DFT energy of O2, PBE in eV/O2
         EO2_PBE = -9.871 #Materials Project value of O2 energy, PBE
-        #EO2_PW91 = -8.760 #DFT energy of O2, PW91 in eV/O2
         EO2_PW91 = -9.09 #Yueh-Lin Lee PRB 2009 value for O2 energy, PW91
-
-        # Data for O starts here!
 
         t = float(float(self.temperature)/1000)
         # These constants good for T = 100-700
@@ -1557,14 +1457,10 @@ class ChemicalPotentialAnalyzer():
                     mu = (EO2_PW91 + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
                     mu = (EO2_PW91 + O_shift_PW91 + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
-
-        #print "The O chem pot is %3.3f" % mu
         return mu, HT_H0, S0
 
-    def _calc_H_chem_pot(self):
-
+    def get_H_chem_pot(self):
         self._check_input()
-
         k = 8.61733*10**-5 #Boltzmann's constant in eV/K
         P0 = 1 #standard pressure in atm
         H2_shift_from0K = -0.087766 #Shift, in eV/H2, of enthalpy of H2 from T=298K to T=0K. Subtract this so that DFT energy more comparable to T=298K standard state
@@ -1573,8 +1469,6 @@ class ChemicalPotentialAnalyzer():
         Nav = 6.0221409*10**23 #Avogadro's number
         EH2_PBE = -6.717 #DFT energy of H2, PBE in eV/H2
         EH2_PW91 = -6.746 #DFT energy of H2, PW91 in eV/H2
-
-        # Data for H starts here!
 
         t = float(float(self.temperature)/1000)
         # These constants good for T = 298-1000
@@ -1631,17 +1525,15 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == True:
                     mu = (EH2_PW91 - H2_shift_from0K + ZPE_H2 + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
-        #print "The H chem pot (from H2 gas) is %3.3f" % mu
         return mu, HT_H0, S0
 
-    def _calc_H_chem_pot_fromH2O(self):
+    def get_H_chem_pot_fromH2O(self):
         # A note of caution when using this function: The H2O energies used here are ONLY for PBE. A similar analysis
         # with PW91 has not been performed.
         if self.functional != "PBE":
-            print "ERROR: This function is only applicable to DFT-PBE energies, exiting..."
-            exit()
+            raise TypeError('This function is only applicable to DFT-PBE energies, exiting...')
         # A conceptual note about why the chemical potential of H2O at 298 is used: The O and H chemical potentials are
-        # changed, so H2O energy remains fixed (only end members change). This choice of chemical potentials reproduces
+        # changed, so H2O DFT energy remains fixed (only end members change). This choice of chemical potentials reproduces
         # the correct experimental formation energy of H2O at the relevant conditions of interest to the user. This is
         # how the phase diagrams in MP are calculated: only end member energy changes, and this changes formation energies
         # of all compounds, however the effective calculated energy of each compound is unchanged
@@ -1662,12 +1554,13 @@ class ChemicalPotentialAnalyzer():
         P_H2O = 10**(A-(B/(C+T)))  #atm
         # Adjust pressure for relative humidity
         P_H2O = P_H2O*self.relative_humidity #atm
-        mu_O_nouse, H_O, S_O = self._calc_O_chem_pot()
-        mu_O, H_Onouse, S_Onouse = ChemicalPotentialAnalyzer(temperature=self.temperature, pressure=self.pressure_O2_forH2O, functional=self.functional, energy_shift=self.energy_shift)._calc_O_chem_pot()
-        mu_H_gas, H_H, S_H = self._calc_H_chem_pot()
+        mu_O, H_O, S_O = self.get_O_chem_pot()
+        mu_H_gas, H_H, S_H = self.get_H_chem_pot()
 
-        mu_O0, H0_O, S0_O = ChemicalPotentialAnalyzer(temperature=298, pressure=1, functional=self.functional, relative_humidity=1, energy_shift=self.energy_shift)._calc_O_chem_pot()
-        mu_H0_gas, H0_H, S0_H = ChemicalPotentialAnalyzer(temperature=298, pressure=1, functional=self.functional, relative_humidity=1, energy_shift=self.energy_shift)._calc_H_chem_pot()
+        mu_O0, H0_O, S0_O = ChemicalPotentialAnalyzer(temperature=298, pressure=1, functional=self.functional,
+                                                      relative_humidity=1, energy_shift=self.energy_shift).get_O_chem_pot()
+        mu_H0_gas, H0_H, S0_H = ChemicalPotentialAnalyzer(temperature=298, pressure=1, functional=self.functional,
+                                                          relative_humidity=1, energy_shift=self.energy_shift).get_H_chem_pot()
 
         t = float(float(self.temperature)/1000)
         # These constants good for T = 298-500 (H2O in liquid phase)
@@ -1690,19 +1583,6 @@ class ChemicalPotentialAnalyzer():
         G2_H2O = 223.3967
         H2_H2O = -241.8264
 
-        """
-        if self.temperature < 500:
-            S_H2O = A1_H2O*math.log(t) + B1_H2O*t + (C1_H2O*t**2)/2 + (D1_H2O*t**3)/3 - E1_H2O/(2*t**2) + G1_H2O + (H_vaporization_298*conv*Nav)/298
-            H_H2O = A1_H2O*t + (B1_H2O*t**2)/2 + (C1_H2O*t**3)/3 + (D1_H2O*t**4)/4 - E1_H2O/(t) + F1_H2O - H1_H2O
-
-        if self.temperature >= 500:
-            t_red = 0.5 #reduced T of 500/1000
-            S_H2O = A1_H2O*math.log(t_red) + B1_H2O*t + (C1_H2O*t_red**2)/2 + (D1_H2O*t_red**3)/3 - E1_H2O/(2*t_red**2) + G1_H2O
-            H_H2O = A1_H2O*t_red + (B1_H2O*t_red**2)/2 + (C1_H2O*t_red**3)/3 + (D1_H2O*t_red**4)/4 - E1_H2O/(t_red) + F1_H2O - H1_H2O
-            S_H2O = S_H2O + A2_H2O*math.log(t-t_red) + B2_H2O*(t-t_red) + (C2_H2O*(t-t_red)**2)/2 + (D2_H2O*(t-t_red)**3)/3 - E2_H2O/(2*(t-t_red)**2) + G2_H2O
-            H_H2O = H_H2O + A2_H2O*(t-t_red) + (B2_H2O*(t-t_red)**2)/2 + (C2_H2O*(t-t_red)**3)/3 + (D2_H2O*(t-t_red)**4)/4 - E2_H2O/(t-t_red) + F2_H2O - H2_H2O
-        """
-
         S_H2O = A2_H2O*math.log(t) + B2_H2O*(t) + (C2_H2O*(t)**2)/2 + (D2_H2O*(t)**3)/3 - E2_H2O/(2*(t)**2) + G2_H2O
         H_H2O = A2_H2O*(t) + (B2_H2O*(t)**2)/2 + (C2_H2O*(t)**3)/3 + (D2_H2O*(t)**4)/4 - E2_H2O/(t) + F2_H2O - H2_H2O
 
@@ -1718,52 +1598,24 @@ class ChemicalPotentialAnalyzer():
         Gform_H2O = (Hform0_liqH2O + H_vaporization_298 + H_H2O - H_H - 0.5*H_O - (H0_H2O - H0_H - 0.5*H0_O)) \
                     - self.temperature*(S_H2O - S_H - 0.5*S_O) -(S0_H2O- S0_H - 0.5*S0_O)*(self.temperature-298) \
                     + k*self.temperature*math.log(P_H2O/P0)
-        """
-        print "In eV"
-        print H_O, S_O, H0_O, S0_O
-        print H_H, S_H, H0_H, S0_H
-        print H_H2O, S_H2O, H0_H2O, S0_H2O
-        print Hform0_liqH2O, H_vaporization_298, Hform0_gasH2O
-        print "In J"
-        print H_O*Nav*conv, S_O*Nav*conv, H0_O*Nav*conv, S0_O*Nav*conv
-        print H_H*Nav*conv, S_H*Nav*conv, H0_H*Nav*conv, S0_H*Nav*conv
-        print H_H2O*Nav*conv, S_H2O*Nav*conv, H0_H2O*Nav*conv, S0_H2O*Nav*conv
-        print Hform0_liqH2O*Nav*conv, H_vaporization_298*Nav*conv, Hform0_gasH2O*Nav*conv
-        """
 
         # Need to incorporate O correction shift. If applying shift to O, then don't apply to H2O. If not on O, needs
         # to be on H2O.
-        if self.energy_shift == True:
+        if self.energy_shift == bool(True):
             mu_H2O = -14.885 # MP calculated value, eV/H2O, no O shift because shift is applied to O gas, not compound
-        if self.energy_shift == False:
+        if self.energy_shift == bool(False):
             mu_H2O = -14.885 - 0.7023 # Apply the O shift to H2O value, this is needed if doing stability calculations
             if self.functional == "PW91" or self.functional == "pw91":
                 raise TypeError("This analysis with H2O is only valid for PBE functionals, any results with a PW91 O shift may be incorrect")
 
-        # The MP structure for water is a solid. Need to add the heat of melting and relative humidity terms
-        #mu_H2O = mu_H2O + H_melt + H_vaporization_298 - 298*S0_H2O + k*T*math.log(P_H2O/P0) # chem pot of H2O vapor at room temperature and certain RH, starting from solid H2O from MP
-        #mu_H2O = mu_H2O + k*T*math.log(P_H2O/P0)
-
-
-        #print "The formation energy of H2O gas is", Gform_H2O
-
         mu_H = 0.5*(mu_H2O - mu_O - Gform_H2O)
-
-        #print "H2O, O, H chem pots:", mu_H2O, mu_O, mu_H
-        #mu_H2O = mu_H2O + H_melt + H_vaporization_298 -298*S0_H2O
-        #mu_H = 0.5*(mu_H2O - mu_O - Gform_H2O)
-        #print "H2O, O, H chem pots:", mu_H2O, mu_O, mu_H
-
-        #mu_H = 0.5*(mu_H2O - mu_O - Gform_H2O)
-
         return mu_H
 
-    def _calc_N_chem_pot(self):
+    def get_N_chem_pot(self):
         self._check_input()
         #Check to make sure PBE functional is specifed, else quit
         if self.functional != "PBE":
-            print "ERROR: This function is only applicable to DFT-PBE energies, exiting..."
-            exit()
+            raise TypeError('This function is only applicable to DFT-PBE energies, exiting...')
         k = 8.61733*10**-5 #Boltzmann's constant in eV/K
         P0 = 1 #standard pressure in atm
         conv = 1.60217662*10**-19 #J per eV
@@ -1771,8 +1623,6 @@ class ChemicalPotentialAnalyzer():
         EN2_PBE = -16.653 #Materials Project value of N2 energy, PBE
         N2_shift_from0K = -0.0900465 #Shift, in eV/N2, of enthalpy of N2 from T=298K to T=0K. Subtract this so that DFT energy more comparable to T=298K standard state
         N_shift_PBE = 2*0.37425 #Materials Project gas shift for N2, eV/N2
-
-        # Data for N starts here!
 
         t = float(float(self.temperature)/1000)
         # These constants good for T = 100-500
@@ -1820,12 +1670,11 @@ class ChemicalPotentialAnalyzer():
 
         return mu, HT_H0, S0
 
-    def _calc_F_chem_pot(self):
+    def get_F_chem_pot(self):
         self._check_input()
         #Check to make sure PBE functional is specifed, else quit
         if self.functional != "PBE":
-            print "ERROR: This function is only applicable to DFT-PBE energies, exiting..."
-            exit()
+            raise TypeError('This function is only applicable to DFT-PBE energies, exiting...')
         k = 8.61733*10**-5 #Boltzmann's constant in eV/K
         P0 = 1 #standard pressure in atm
         conv = 1.60217662*10**-19 #J per eV
@@ -1861,12 +1710,11 @@ class ChemicalPotentialAnalyzer():
 
         return mu, HT_H0, S0
 
-    def _calc_Cl_chem_pot(self):
+    def get_Cl_chem_pot(self):
         self._check_input()
         #Check to make sure PBE functional is specifed, else quit
         if self.functional != "PBE":
-            print "ERROR: This function is only applicable to DFT-PBE energies, exiting..."
-            exit()
+            raise TypeError('This function is only applicable to DFT-PBE energies, exiting...')
         k = 8.61733*10**-5 #Boltzmann's constant in eV/K
         P0 = 1 #standard pressure in atm
         conv = 1.60217662*10**-19 #J per eV
@@ -1874,8 +1722,6 @@ class ChemicalPotentialAnalyzer():
         ECl2_PBE = -3.5997 #Materials Project value of Cl2 energy, PBE
         Cl_shift_PBE = 2*0.5460 #Materials Project gas shift for Cl2, eV/Cl2
         Cl2_shift_from0K = -0.105023362 #Shift, in eV/Cl2, of enthalpy of Cl2 from T=298K to T=0K. Subtract this so that DFT energy more comparable to T=298K standard state
-
-        # Data for Cl starts here!
 
         t = float(float(self.temperature)/1000)
         # These constants good for T = 298-1000
@@ -1923,12 +1769,11 @@ class ChemicalPotentialAnalyzer():
 
         return mu, HT_H0, S0
 
-    def _calc_Br_chem_pot(self):
+    def get_Br_chem_pot(self):
         self._check_input()
         #Check to make sure PBE functional is specifed, else quit
         if self.functional != "PBE":
-            print "ERROR: This function is only applicable to DFT-PBE energies, exiting..."
-            exit()
+            raise TypeError('This function is only applicable to DFT-PBE energies, exiting...')
         k = 8.61733*10**-5 #Boltzmann's constant in eV/K
         P0 = 1 #standard pressure in atm
         conv = 1.60217662*10**-19 #J per eV
@@ -1939,8 +1784,6 @@ class ChemicalPotentialAnalyzer():
         # more comparable to T=298K standard state. No liquid thermochem data for Br2 on NIST website, assume shift is for gaseous Br2.
         H_vap_Br2 = 0.324850548 #H of vaporization in eV/Br2. Br2 is liquid under standard conditions, and vaporizes at 332 K. DFT calculation
         # is for sol/liq Br2, so add this term to the free energy.
-
-        # Data for Br starts here!
 
         t = float(float(self.temperature)/1000)
         # These constants good for T = 332-3400, Br2 in gaseous state. USE THIS FOR GAS PHASE ENERGIES
@@ -1968,12 +1811,11 @@ class ChemicalPotentialAnalyzer():
 
         return mu, HT_H0, S0
 
-    def _calc_I_chem_pot(self):
+    def get_I_chem_pot(self):
         self._check_input()
         #Check to make sure PBE functional is specifed, else quit
         if self.functional != "PBE":
-            print "ERROR: This function is only applicable to DFT-PBE energies, exiting..."
-            exit()
+            raise TypeError('This function is only applicable to DFT-PBE energies, exiting...')
         k = 8.61733*10**-5 #Boltzmann's constant in eV/K
         P0 = 1 #standard pressure in atm
         conv = 1.60217662*10**-19 #J per eV
@@ -1986,8 +1828,6 @@ class ChemicalPotentialAnalyzer():
         # all temperatures, so add this term into free energy
         H_vap_I2 = 0.431750249 #H of vaporization in eV/I2. I2 is solid under standard conditions, and vaporizes at 458 K. We want energy of I2 gas at
         # all temperatures, so add this term into free energy
-
-        # Data for I starts here!
 
         t = float(float(self.temperature)/1000)
         # These constants good for T = 298-387 (I2 is solid)
@@ -2017,7 +1857,6 @@ class ChemicalPotentialAnalyzer():
         G3 = 305.9199
         H3 = 62.4211
 
-
         S0 = A3*math.log(t) + B3*t + (C3*t**2)/2 + (D3*t**3)/3 - E3/(2*t**2) + G3  #in J/mol-K
         HT_H0 = A3*t + (B3*t**2)/2 + (C3*t**3)/3 + (D3*t**4)/4 - E3/(t) + F3 - H3  #in kJ/mol
         S0 = S0 /(conv*Nav) #in eV/atom-K
@@ -2031,3 +1870,20 @@ class ChemicalPotentialAnalyzer():
                 mu = (EI2_PBE - I2_shift_from0K + H_fusion_I2 + H_vap_I2 + I_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
+
+    def _check_input(self):
+        func_list = ["pw91", "PW91", "PBE", "pbe"]
+        if self.temperature <= 0:
+            print "ERROR: You have selected on a nonsensical temperature. Exiting..."
+            exit()
+        if self.pressure <= 0:
+            print "ERROR: You have selected on a nonsensical pressure. Exiting..."
+            exit()
+        if self.functional not in func_list:
+            print "ERROR: You must specify one of either PW91 or PBE functionals. Exiting..."
+            exit()
+        # if self.energy_shift == "True":
+        #    print "Applying the shift corrections"
+        # if self.energy_shift == "False":
+        #    print "No shift corrections made"
+        return None
