@@ -76,13 +76,13 @@ plot_mean_squared_displacement = True
 ########################################################################################################################
 ########################################################################################################################
 
-from VASP_PostProcessing import *
+from VASP_PostProcessing import DiffusionAnalyzerAIMD
 
 def main():
-    diff = AIMDAnalyzer(xdatcar="XDATCAR", diffusing_species=element_of_diffusing_species, temperature=temperature,
+    diff = DiffusionAnalyzerAIMD(xdatcar="XDATCAR", diffusing_species=element_of_diffusing_species, temperature=temperature,
                         timestep=timestep_size, steps_to_ignore=100, smoothing=msd_smoothing_method, min_obs=30,
                         avg_nsteps=1000, plot_msd=plot_mean_squared_displacement)
-    diff.get_diffusion_analysis
+    diff.get_diffusion_analysis_from_xdatcars()
 
 if __name__=="__main__":
     main()
