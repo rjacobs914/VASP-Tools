@@ -56,42 +56,37 @@ plot_projected_dos = True
 # Specify whether or not to calculate the bandgap (True/False)
 calculate_bandgap = True
 
-# If calculate_bandgap = True, need to specify whether to get bandgap from DOSCAR or OUTCAR (or both)
-get_bandgap_from_dos = False
-get_bandgap_from_outcar = True
-
 # Specify whether or not to calculate the band centers of each element (True/False)
 calculate_bandcenters = True
+write_bandcenters_to_file = True
 
 # Specify whether or not to calculate the oxygen charge transfer gap (only relevant for systems containing oxygen) (True/False)
 calculate_charge_transfer_gap = True
 
 # Specify whether or not to calculate the effective densities of states of the valence and conduction bands
 calculate_effective_dos = True
+effective_dos_temperature = 1000 # Temperature, in K, to evaluate effective DOS at
 
 ########################################################################################################################
 ########################################################################################################################
 
-from VASP_PostProcessing import *
+from VASP_PostProcessing import DoscarAnalyzer
 
-dos = DOSAnalyzer(poscar="POSCAR", incar="INCAR", outcar="OUTCAR", doscar="DOSCAR")
+dos = DoscarAnalyzer(poscar="POSCAR", incar="INCAR", outcar="OUTCAR", doscar="DOSCAR")
 
 def main():
     if plot_total_dos == True:
-        dos.get_total_dos_plot
+        dos.plot_total_dos()
     if plot_projected_dos == True:
-        dos.get_projected_dos_plot
+        dos.plot_projected_dos()
     if calculate_bandcenters == True:
-        dos.get_bandcenters
+        dos.get_bandcenters(write_dicts_to_file=write_bandcenters_to_file)
     if calculate_bandgap == True:
-        if get_bandgap_from_dos == True:
-            dos.get_bandgap_from_dos
-        if get_bandgap_from_outcar == True:
-            dos.get_bandgap_from_outcar
+        dos.get_bandgap_from_dos()
     if calculate_charge_transfer_gap == True:
-        dos.get_chgtransgap
+        dos.get_O_chargetransfergap()
     if calculate_effective_dos == True:
-        dos.get_effective_dos
+        dos.get_effective_dos(temperature=effective_dos_temperature)
 
 if __name__=="__main__":
     main()
