@@ -36,6 +36,10 @@ class WulffWrapper(object):
         miller_indices: (list of tuples) A list of miller indices, where each miller index is represented as a tuple.
             For example, miller_indices = [(1, 0, 0), (1, 1, 0), (1, 1, 1)]
         surface_energies: (list of floats) A list of calculated surface energies to pair with the list of miller indices.
+    instance methods:
+        get_wulff_construction : (wulff object) Creates a wulff construction and saves an image of it to a file
+        get_wulff_area_fraction : (dict) Returns the area fraction of each miller index in the Wulff construction
+        get_wulff_surface_energies : (dict) Returns the surface energy of each miller index in the Wulff construction
     """
     def __init__(self, miller_indices, surface_energies, poscar="POSCAR"):
         self.miller_indices = miller_indices
@@ -70,10 +74,15 @@ class LocpotAnalyzer(object):
         poscar: (str) The name of a POSCAR file
         outcar: (str) The name of an OUTCAR file
         locpot: (str) the name of a LOCPOT file
-    example usage:
-        surfpot = SurfacePotentialAnalyzer(poscar="POSCAR", outcar="OUTCAR", locpot="LOCPOT")
-        surfpot.get_electrostatic_plot #Plot the electrostatic potential
-        surfpot.get_workfunction #Obtain values of the work function
+    instance methods:
+        get_electrostatic_potential : (list) Returns a list of the planar averaged electrostatic potential from LOCPOT
+            file, and also saves the data to an excel file and saves a plot of the data.
+        get_workfunction : (tuple of floats) Returns a tuple containing the top surface and bottom surface work functions
+        get_vacuum_energy : (float) Returns the vacuum energy of either the top or bottom surface.
+            args:
+                surface : (str) Set as "Top" to calculate vacuum energy of top surface, analogously for "Bottom"
+        get_empirical_delta_workfunction : (float) Returns the difference in top and bottom surface work functions as
+            calculated using the VASP calculated dipole and the Helmholtz equation from electrostatics.
     """
     def __init__(self, poscar="POSCAR", outcar="OUTCAR", locpot="LOCPOT"):
         self.poscar = poscar
@@ -113,7 +122,7 @@ class LocpotAnalyzer(object):
         vacuum_energy_bottom = self.get_vacuum_energy(surface="Bottom")
         workfunction_top = vacuum_energy_top-fermi_energy
         workfunction_bottom = vacuum_energy_bottom-fermi_energy
-        return workfunction_top, workfunction_bottom
+        return (workfunction_top, workfunction_bottom)
 
     def get_vacuum_energy(self, surface):
         Nx, Ny, Nz, z_coord, LOCPOTdata_column = self._parse_locpot()
@@ -233,7 +242,7 @@ class LocpotAnalyzer(object):
         avg_planaravg = sum_planaravg/Nz
         return planaravg, avg_planaravg
 
-class AIMDAnalyzer(object):
+class DiffusionAnalyzerAIMD(object):
     """This class wraps to the pymatgen tools to analyze the output of Ab Initio Molecular Dynamics (AIMD) runs in order
     to calculate and plot the mean-squared displacement (MSD) and calculate the diffusivity components and total
     diffusivity of a given element.
@@ -255,9 +264,9 @@ class AIMDAnalyzer(object):
             observations to have before data are included in the MSD calculation. The suggested default is 30.
         avg_nsteps: (int) This is only used if smoothing = "constant". This determines how many timesteps are averaged over
             when iterating over each timestep. The suggested default is 1000.
-    example usage:
-        diff = AIMDAnalyzer(xdatcar="XDATCAR", diffusing_species="O", temperature=1000, timestep=2)
-        diff.get_diffusion_analysis
+    instance methods:
+        get_diffusion_analysis_from_xdatcars : (dict) Computes the diffusivity of the species of interest and provides
+            data of diffusivity and conductivity of the species. Also, plots the MSD and saves to file.
     """
     def __init__(self, diffusing_species, temperature, timestep, xdatcar="XDATCAR", steps_to_ignore=100,
       smoothing="max", min_obs=30, avg_nsteps=1000, plot_msd=True, loop_directories=False):
@@ -289,13 +298,12 @@ class AIMDAnalyzer(object):
             pyplot.ylabel('MSD (Ang^2)')
             pyplot.title('MSD vs time')
             pyplot.savefig('MSD.pdf')
-            print "A plot of the MSD and data have been saved!"
 
-        print "D of %s (cm^2/sec): %3.3e +/- %3.3e" % (self.diffusing_species, outputdict["D"], outputdict["D_sigma"])
-        print "S of %s (mS/cm): %3.3e +/- %3.3e" % (self.diffusing_species, outputdict["S"], outputdict["S_sigma"])
-        print "D components of %s (cm^2/sec):" % (self.diffusing_species), outputdict["D_components"]
-        print "D sigma components of %s (cm^2/sec):" % (self.diffusing_species), outputdict["D_components_sigma"]
-        print "Specie %s, temp %3.3fK, timestep %i fs, skipping %i initial structures, smoothing %s with min_obs of %i and avg_nsteps of %i" % (self.diffusing_species, self.temperature, self.timestep, self.steps_to_ignore, self.smoothing, self.min_obs, self.avg_nsteps)
+        #print "D of %s (cm^2/sec): %3.3e +/- %3.3e" % (self.diffusing_species, outputdict["D"], outputdict["D_sigma"])
+        #print "S of %s (mS/cm): %3.3e +/- %3.3e" % (self.diffusing_species, outputdict["S"], outputdict["S_sigma"])
+        #print "D components of %s (cm^2/sec):" % (self.diffusing_species), outputdict["D_components"]
+        #print "D sigma components of %s (cm^2/sec):" % (self.diffusing_species), outputdict["D_components_sigma"]
+        #print "Specie %s, temp %3.3fK, timestep %i fs, skipping %i initial structures, smoothing %s with min_obs of %i and avg_nsteps of %i" % (self.diffusing_species, self.temperature, self.timestep, self.steps_to_ignore, self.smoothing, self.min_obs, self.avg_nsteps)
         return outputdict
 
     def _prepare_xdatcar_from_dirs(self):
@@ -325,11 +333,20 @@ class DoscarAnalyzer(object):
         doscar: (str) the name of a DOSCAR file
         energy_cutoff: (float) A user-specified cutoff energy to select a special energy for band center calculations.
             Typically you won't use this input flag.
-    example usage:
-        dos = DOSAnalyzer(poscar="POSCAR", incar="INCAR", outcar="OUTCAR", doscar="DOSCAR")
-        dos.get_projected_dos_plot #Plot the projected DOS
-        dos.get_bandcenters #Obtain the bandcenters for each element
-        dos.get_bandgap_from_outcar #Get the bandgap of the simulated structure
+    instance methods:
+        plot_total_dos : (None) saves a plot of the total DOS to file
+        plot_projected_dos : (None) saves a plot of the projected DOS to file
+        get_bandgap_from_dos : (float) gives the bandgap of the system calculated from the DOS
+        get_O_chargetransfergap : (float) gives the charge transfer gap between occupied and unoccupied O states. Only
+            relevant for systems containing O.
+        get_bandcenters : (list of dict) returns a list of dicts containing the band centers of each orbital type (s, p, etc.)
+            of each element in the system.
+                args:
+                    write_dicts_to_file : (bool) whether to write the bandcenter dicts to a text file.
+        get_effective_dos : (tuple of floats) returns the effective density of states for the valence and conduction bands,
+            as well as the integral of the valence and conduction bands.
+                args:
+                    temperature : (int) The effective DOS is T-dependent. Specify a T value (in K) to do the analysis.
     """
     def __init__(self, poscar="POSCAR", incar="INCAR", outcar="OUTCAR", doscar="DOSCAR", energy_cutoff=0):
         self.poscar = poscar
@@ -337,6 +354,280 @@ class DoscarAnalyzer(object):
         self.outcar = outcar
         self.doscar = doscar
         self.energy_cutoff = energy_cutoff
+
+    def plot_total_dos(self):
+        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
+        dosdata, total_dos = self._cleanup_projected_dos()
+        number_of_atoms = PoscarAnalyzer(poscar=self.poscar).get_total_atoms
+
+        total_dos_down_list_neg = []
+        for index in range(len(total_dos_down_list)):
+            total_dos_down_list_neg.append(-1*total_dos_down_list[index])
+
+        total_dos_normalized = []
+        for index in range(len(total_dos)):
+            total_dos_normalized.append(total_dos[index]/number_of_atoms)
+
+        pyplot.figure(figsize=(8,6), dpi=80)
+        pyplot.plot(energy, total_dos_up_list, 'b', label='Total DOS spin up')
+        pyplot.plot(energy, total_dos_down_list_neg, 'g', label='Total DOS spin down')
+        #pyplot.plot(energy, total_dos_normalized, 'k', label='Total DOS')
+        pyplot.plot([0,0], [min(total_dos_up_list), max(total_dos_up_list)], 'k-', label='Fermi energy')
+        pyplot.xlabel('Energy (E-EFermi, eV)')
+        pyplot.ylabel('Total Densities of States (states/eV-atom)')
+        pyplot.title('Total Density of States')
+        pyplot.legend()
+        pyplot.ylim(-1*max(total_dos), max(total_dos))
+        pyplot.xlim([-10, 10])
+        pyplot.savefig('TotalDOS.pdf')
+        return None
+
+    def plot_projected_dos(self):
+        sumtotaldosup, sumtotaldosdown, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
+        nedos = self._calc_nedos()
+        atom_amounts = PoscarAnalyzer(self.poscar).get_atom_amounts()
+        element_names = PoscarAnalyzer(self.poscar).get_element_names()
+
+        pyplot.figure(figsize=(8,6), dpi=80)
+        #Need to normalize and plot PDOS by element type
+
+        colors = "bgrkybgrkybgrkybgrkybgrky"
+        for element_number in range(len(atom_amounts)):
+            dos_to_plot_up = []
+            dos_to_plot_down = []
+            for index in range(nedos):
+                dos_to_plot_up.append((dos_s_list[index + nedos*element_number][0] + dos_p_list[index + nedos*element_number][0] + dos_d_list[index + nedos*element_number][0])/atom_amounts[element_number])
+                dos_to_plot_down.append(-1*(dos_s_list[index + nedos*element_number][1] + dos_p_list[index + nedos*element_number][1] + dos_d_list[index + nedos*element_number][1])/atom_amounts[element_number])
+            pyplot.plot(energy, dos_to_plot_up, color=colors[element_number], label='PDOS for %s' % (element_names[element_number]))
+            pyplot.plot(energy, dos_to_plot_down, color=colors[element_number])
+
+        pyplot.xlabel('Energy (E-EFermi, eV)')
+        pyplot.ylabel('Projected Densities of States (states/eV-atom)')
+        pyplot.title('Projected Density of States')
+        pyplot.legend()
+        pyplot.xlim([-10, 10])
+        pyplot.ylim([-5, 5])
+        pyplot.savefig('ProjectedDOS.pdf')
+        return None
+
+    def get_bandgap_from_dos(self):
+        E_VBM, E_CBM = self._calc_VBM_and_CBM()
+        Egap = E_CBM - E_VBM
+        if Egap < 0.1:
+            Egap = 0
+
+        #print "The bandgap of this material from DOS is %s eV" % (Egap)
+        bandgapfile = open("bandgap_fromdos.txt", "w")
+        Egap = str(Egap)
+        bandgapfile.write(Egap)
+        bandgapfile.close()
+        return Egap
+
+    def get_O_chargetransfergap(self):
+        # Same method as regular bandgap, but now just doing it between occupied and unoccupied O states
+        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
+        nedos = self._calc_nedos()
+        atom_amounts = PoscarAnalyzer(self.poscar).get_atom_amounts()
+        element_names = PoscarAnalyzer(self.poscar).get_element_names()
+        Etolerance = 0.05
+        DOStolerance = 0.001
+
+        # Find which element, if any, is O. This analysis only pertains to O, so throw error if no O found
+        if "O" not in element_names:
+            raise TypeError("No oxygen was detected in your element list. The charge transfer gap calculation only pertains to O states. Exiting calculation...")
+
+        # Find out which entry is O and perform charge transfer gap calculation
+        for element_number in range(len(element_names)):
+            if element_names[element_number] == "O":
+                # Add the respective p up and p down states based on the element entry
+                # print "O is element number", element_number
+                dos_O_p_total = []
+                for dos_row in range(nedos):
+                    dos_O_p_total.append((dos_p_list[dos_row + nedos * element_number][0] +
+                                          dos_p_list[dos_row + nedos * element_number][1]) / atom_amounts[
+                                             element_number])
+
+                # Find the position of the VBM
+                for index in range(nedos):
+                    if energy[index] >= 0 - Etolerance:
+                        if energy[index] <= 0 + Etolerance:
+                            E_VBM = energy[index]
+                            VBM_index = index
+
+                    elif energy[index] < 0 - Etolerance or energy[index] > 0 + Etolerance:
+                        pass
+
+                E_above_VBM_range = []
+                for index in range(nedos - VBM_index):
+                    E_above_VBM_range.append(VBM_index + index)
+
+                # Find the position of the last O state after Efermi (where O states go to zero)
+                for entry in E_above_VBM_range:
+                    if abs(dos_O_p_total[entry] - dos_O_p_total[entry - 1]) > 0 + DOStolerance:
+                        pass
+                    elif abs(dos_O_p_total[entry] - dos_O_p_total[entry - 1]) <= 0 + DOStolerance:
+                        new_E_VBM = energy[entry]
+                        new_VBM_index = entry
+                        break
+
+                new_E_above_VBM_range = []
+                for index in range(nedos - new_VBM_index):
+                    new_E_above_VBM_range.append(new_VBM_index + index)
+
+                for entry in new_E_above_VBM_range:
+                    if abs(dos_O_p_total[entry] - dos_O_p_total[entry - 1]) > 0 + DOStolerance:
+                        new_CBM_index = entry
+                        new_E_CBM = energy[entry]
+                        break
+                    elif abs(dos_O_p_total[entry] - dos_O_p_total[entry - 1]) < 0 + DOStolerance:
+                        pass
+
+                Echgtransgap = new_E_CBM - new_E_VBM
+                if Echgtransgap < 0.1:
+                    Echgtransgap = 0
+
+                #print "The charge transfer gap for O in this material is %s eV" % (Echgtransgap)
+                bandgapfile = open("chgtransgap.txt", "w")
+                Echgtransgap = str(Echgtransgap)
+                bandgapfile.write(Echgtransgap)
+                bandgapfile.close()
+                return Echgtransgap
+
+    def get_bandcenters(self, write_dicts_to_file=True):
+        nedos = self._calc_nedos()
+        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
+        sumtotaldosup, sumtotaldosdown, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+        pa = PoscarAnalyzer(self.poscar)
+        element_names = pa.get_element_names()
+        atom_amounts = pa.get_atom_amounts()
+        dos_s_list_E = []
+        dos_s_list_total_occ = []
+        dos_p_list_E = []
+        dos_p_list_total_occ = []
+        dos_d_list_E = []
+        dos_d_list_total_occ = []
+        dos_s_list_total = []
+        dos_s_list_E_occ = []
+        dos_p_list_total = []
+        dos_p_list_E_occ = []
+        dos_d_list_total = []
+        dos_d_list_E_occ = []
+
+        band_center_list = []
+        band_center_occ_list = []
+
+        for element_number in range(len(atom_amounts)):
+            for index in range(nedos):
+                dos_s_list_total.append(
+                    dos_s_list[index + nedos * element_number][0] + dos_s_list[index + nedos * element_number][1])
+                dos_p_list_total.append(
+                    dos_p_list[index + nedos * element_number][0] + dos_p_list[index + nedos * element_number][1])
+                dos_d_list_total.append(
+                    dos_d_list[index + nedos * element_number][0] + dos_d_list[index + nedos * element_number][1])
+                dos_s_list_E.append(dos_s_list_total[index] * energy[index])
+                dos_p_list_E.append(dos_p_list_total[index] * energy[index])
+                dos_d_list_E.append(dos_d_list_total[index] * energy[index])
+                if index < index_Fermi:
+                    dos_s_list_total_occ.append(
+                        dos_s_list[index + nedos * element_number][0] + dos_s_list[index + nedos * element_number][1])
+                    dos_p_list_total_occ.append(
+                        dos_p_list[index + nedos * element_number][0] + dos_p_list[index + nedos * element_number][1])
+                    dos_d_list_total_occ.append(
+                        dos_d_list[index + nedos * element_number][0] + dos_d_list[index + nedos * element_number][1])
+                    dos_s_list_E_occ.append(dos_s_list_total[index] * energy[index])
+                    dos_p_list_E_occ.append(dos_p_list_total[index] * energy[index])
+                    dos_d_list_E_occ.append(dos_d_list_total[index] * energy[index])
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                s_bandcenter = integrate.cumtrapz(dos_s_list_E, energy)[-1] / \
+                               integrate.cumtrapz(dos_s_list_total, energy)[-1]
+                p_bandcenter = integrate.cumtrapz(dos_p_list_E, energy)[-1] / \
+                               integrate.cumtrapz(dos_p_list_total, energy)[-1]
+                d_bandcenter = integrate.cumtrapz(dos_d_list_E, energy)[-1] / \
+                               integrate.cumtrapz(dos_d_list_total, energy)[-1]
+                s_bandcenter_occ = integrate.cumtrapz(dos_s_list_E_occ, energy_occ)[-1] / \
+                                   integrate.cumtrapz(dos_s_list_total_occ, energy_occ)[-1]
+                p_bandcenter_occ = integrate.cumtrapz(dos_p_list_E_occ, energy_occ)[-1] / \
+                                   integrate.cumtrapz(dos_p_list_total_occ, energy_occ)[-1]
+                d_bandcenter_occ = integrate.cumtrapz(dos_d_list_E_occ, energy_occ)[-1] / \
+                                   integrate.cumtrapz(dos_d_list_total_occ, energy_occ)[-1]
+                band_center_dict = {}
+                band_center_dict_occ = {}
+                element = element_names[element_number]
+                band_center_dict[str(element) + "_s"] = "%3.3f" % s_bandcenter
+                band_center_dict[str(element) + "_p"] = "%3.3f" % p_bandcenter
+                band_center_dict[str(element) + "_d"] = "%3.3f" % d_bandcenter
+                band_center_dict_occ[str(element) + "_s_occ"] = "%3.3f" % s_bandcenter_occ
+                band_center_dict_occ[str(element) + "_p_occ"] = "%3.3f" % p_bandcenter_occ
+                band_center_dict_occ[str(element) + "_d_occ"] = "%3.3f" % d_bandcenter_occ
+
+                if write_dicts_to_file == bool(True):
+                    # Write bandcenter dicts to text files
+                    filename = "%s_bandcenters.txt" % element
+                    file = open(filename, "w")
+                    for key, value in band_center_dict.items():
+                        file.write(str(key)+"="+str(value))
+                    file.close()
+                    filename = "%s_bandcenters_occ.txt" % element
+                    file = open(filename, "w")
+                    for key, value in band_center_dict_occ.items():
+                        file.write(str(key)+"="+str(value))
+                    file.close()
+
+                band_center_list.append(band_center_dict)
+                band_center_occ_list.append(band_center_dict_occ)
+
+        return band_center_list, band_center_occ_list
+
+    def get_effective_dos(self, temperature=1000):
+        boltz = 8.619 * 10 ** -5 #units of eV/K
+        E_VBM, E_CBM = self._calc_VBM_and_CBM()
+        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
+        dosdata, total_dos = self._cleanup_projected_dos()
+
+        # Parse total DOS to VBM and CBM components
+        total_dos_VBM = []
+        energy_to_integrate_VBM = []
+        total_dos_CBM = []
+        energy_to_integrate_CBM = []
+        for index in range(len(energy)):
+            # if energy[index] <= E_VBM and energy[index] > E_VBM-10:
+            if energy[index] <= E_VBM:
+                total_dos_VBM.append(total_dos[index])
+                energy_to_integrate_VBM.append(energy[index])
+            # elif energy[index] > E_CBM and energy[index] < E_CBM+10:
+            elif energy[index] > E_CBM:
+                total_dos_CBM.append(total_dos[index])
+                energy_to_integrate_CBM.append(energy[index])
+            else:
+                continue
+
+        # Calculate the effective DOS of the valence band
+        VBM_effective_dos_integrand = []
+        for index in range(len(total_dos_VBM)):
+            VBM_effective_dos_integrand.append(
+                total_dos_VBM[index] * np.exp(-1 * (E_VBM - energy_to_integrate_VBM[index]) / (boltz * temperature)))
+        VBM_effective_dos = integrate.cumtrapz(VBM_effective_dos_integrand, energy_to_integrate_VBM)[-1]
+        VBM_int = integrate.cumtrapz(total_dos_VBM, energy_to_integrate_VBM)[-1]
+
+        # Calculate the effective DOS of the conduction band
+        CBM_effective_dos_integrand = []
+        for index in range(len(total_dos_CBM)):
+            CBM_effective_dos_integrand.append(
+                total_dos_CBM[index] * np.exp(-1 * (energy_to_integrate_CBM[index] - E_CBM) / (boltz * temperature)))
+        CBM_effective_dos = integrate.cumtrapz(CBM_effective_dos_integrand, energy_to_integrate_CBM)[-1]
+        CBM_int = integrate.cumtrapz(total_dos_CBM, energy_to_integrate_CBM)[-1]
+
+        #print "The effective DOS of the VB is:", VBM_effective_dos
+        #print "The effective DOS of the CB is:", CBM_effective_dos
+        #print "The integral of the VB DOS is:", VBM_int
+        #print "The integral of the CB DOS is:", CBM_int
+
+        return (VBM_effective_dos, CBM_effective_dos, VBM_int, CBM_int)
 
     def _calc_nedos(self):
         # Obtain the value of NEDOS from INCAR file
@@ -593,34 +884,6 @@ class DoscarAnalyzer(object):
         #print "length sum dos up list", len(dos_sum_up_list)
         return total_dos_up_list, total_dos_down_list, dos_s_list_float, dos_p_list_float, dos_d_list_float
 
-    def _plot_total_dos(self):
-        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
-        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
-        dosdata, total_dos = self._cleanup_projected_dos()
-        number_of_atoms = PoscarAnalyzer(poscar=self.poscar).get_total_atoms
-
-        total_dos_down_list_neg = []
-        for index in range(len(total_dos_down_list)):
-            total_dos_down_list_neg.append(-1*total_dos_down_list[index])
-
-        total_dos_normalized = []
-        for index in range(len(total_dos)):
-            total_dos_normalized.append(total_dos[index]/number_of_atoms)
-
-        pyplot.figure(figsize=(8,6), dpi=80)
-        pyplot.plot(energy, total_dos_up_list, 'b', label='Total DOS spin up')
-        pyplot.plot(energy, total_dos_down_list_neg, 'g', label='Total DOS spin down')
-        #pyplot.plot(energy, total_dos_normalized, 'k', label='Total DOS')
-        pyplot.plot([0,0], [min(total_dos_up_list), max(total_dos_up_list)], 'k-', label='Fermi energy')
-        pyplot.xlabel('Energy (E-EFermi, eV)')
-        pyplot.ylabel('Total Densities of States (states/eV-atom)')
-        pyplot.title('Total Density of States')
-        pyplot.legend()
-        pyplot.ylim(-1*max(total_dos), max(total_dos))
-        pyplot.xlim([-10, 10])
-        pyplot.savefig('TotalDOS.pdf')
-        print "A plot of the Total DOS has been saved!"
-
     def _calc_VBM_and_CBM(self):
         total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
         energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
@@ -659,246 +922,6 @@ class DoscarAnalyzer(object):
                 pass
 
         return E_VBM, E_CBM
-
-    def _calc_bandgap_from_dos(self):
-
-        E_VBM, E_CBM = self._calc_VBM_and_CBM()
-        Egap = E_CBM - E_VBM
-        if Egap < 0.1:
-            Egap = 0
-
-        print "The bandgap of this material from DOS is %s eV" % (Egap)
-        bandgapfile = open("bandgap.txt", "w")
-        Egap = str(Egap)
-        bandgapfile.write(Egap)
-        bandgapfile.close()
-        return Egap
-
-    def _calc_chgtransgap(self):
-        # Same method as regular bandgap, but now just doing it between occupied and unoccupied O states
-        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
-        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
-        nedos = self._calc_nedos()
-        atom_amounts = PoscarAnalyzer(self.poscar).get_atom_amounts
-
-        element_names = PoscarAnalyzer(self.poscar).get_element_names
-        Etolerance = 0.05
-        DOStolerance = 0.001
-
-        #Find which element, if any, is O. This analysis only pertains to O, so throw error if no O found
-        if "O" not in element_names:
-            raise TypeError("No oxygen was detected in your element list. The charge transfer gap calculation only pertains to O states. Exiting calculation...")
-
-        #Find out which entry is O and perform charge transfer gap calculation
-        for element_number in range(len(element_names)):
-            if element_names[element_number] == "O":
-                # Add the respective p up and p down states based on the element entry
-                #print "O is element number", element_number
-                dos_O_p_total = []
-                for dos_row in range(nedos):
-                    dos_O_p_total.append((dos_p_list[dos_row + nedos*element_number][0] + dos_p_list[dos_row + nedos*element_number][1])/atom_amounts[element_number])
-
-                #Find the position of the VBM
-                for index in range(nedos):
-                    if energy[index] >= 0 - Etolerance:
-                        if energy[index] <= 0 + Etolerance:
-                            E_VBM = energy[index]
-                            VBM_index = index
-
-                    elif energy[index] < 0 - Etolerance or energy[index] > 0 + Etolerance:
-                        pass
-
-                E_above_VBM_range = []
-                for index in range(nedos - VBM_index):
-                    E_above_VBM_range.append(VBM_index + index)
-
-                #Find the position of the last O state after Efermi (where O states go to zero)
-                for entry in E_above_VBM_range:
-                    if abs(dos_O_p_total[entry] - dos_O_p_total[entry-1]) > 0 + DOStolerance:
-                        pass
-                    elif abs(dos_O_p_total[entry] - dos_O_p_total[entry-1]) <= 0 + DOStolerance:
-                        new_E_VBM = energy[entry]
-                        new_VBM_index = entry
-                        break
-
-                new_E_above_VBM_range = []
-                for index in range(nedos - new_VBM_index):
-                    new_E_above_VBM_range.append(new_VBM_index + index)
-
-                for entry in new_E_above_VBM_range:
-                    if abs(dos_O_p_total[entry] - dos_O_p_total[entry-1]) > 0 + DOStolerance:
-                        new_CBM_index = entry
-                        new_E_CBM = energy[entry]
-                        break
-                    elif abs(dos_O_p_total[entry] - dos_O_p_total[entry-1]) < 0 + DOStolerance:
-                        pass
-
-                Echgtransgap = new_E_CBM - new_E_VBM
-                if Echgtransgap < 0.1:
-                    Echgtransgap = 0
-
-                print "The charge transfer gap for O in this material is %s eV" % (Echgtransgap)
-                bandgapfile = open("chgtransgap.txt", "w")
-                Echgtransgap = str(Echgtransgap)
-                bandgapfile.write(Echgtransgap)
-                bandgapfile.close()
-                return Echgtransgap
-
-    def _calc_bandcenters(self, dos_s_list, dos_p_list, dos_d_list, element_number):
-        nedos = self._calc_nedos()
-        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
-        element_names = PoscarAnalyzer(self.poscar).get_element_names
-        dos_s_list_E = []; dos_s_list_total_occ = []
-        dos_p_list_E = []; dos_p_list_total_occ = []
-        dos_d_list_E = []; dos_d_list_total_occ = []
-        dos_s_list_total = []; dos_s_list_E_occ = [];
-        dos_p_list_total = []; dos_p_list_E_occ = [];
-        dos_d_list_total = []; dos_d_list_E_occ = [];
-
-        for index in range(nedos):
-            dos_s_list_total.append(dos_s_list[index + nedos*element_number][0]+dos_s_list[index + nedos*element_number][1])
-            dos_p_list_total.append(dos_p_list[index + nedos*element_number][0]+dos_p_list[index + nedos*element_number][1])
-            dos_d_list_total.append(dos_d_list[index + nedos*element_number][0]+dos_d_list[index + nedos*element_number][1])
-            dos_s_list_E.append(dos_s_list_total[index]*energy[index])
-            dos_p_list_E.append(dos_p_list_total[index]*energy[index])
-            dos_d_list_E.append(dos_d_list_total[index]*energy[index])
-            if index < index_Fermi:
-                dos_s_list_total_occ.append(dos_s_list[index + nedos*element_number][0]+dos_s_list[index + nedos*element_number][1])
-                dos_p_list_total_occ.append(dos_p_list[index + nedos*element_number][0]+dos_p_list[index + nedos*element_number][1])
-                dos_d_list_total_occ.append(dos_d_list[index + nedos*element_number][0]+dos_d_list[index + nedos*element_number][1])
-                dos_s_list_E_occ.append(dos_s_list_total[index]*energy[index])
-                dos_p_list_E_occ.append(dos_p_list_total[index]*energy[index])
-                dos_d_list_E_occ.append(dos_d_list_total[index]*energy[index])
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            s_bandcenter = integrate.cumtrapz(dos_s_list_E, energy)[-1] / integrate.cumtrapz(dos_s_list_total, energy)[-1]
-            p_bandcenter = integrate.cumtrapz(dos_p_list_E, energy)[-1] / integrate.cumtrapz(dos_p_list_total, energy)[-1]
-            d_bandcenter = integrate.cumtrapz(dos_d_list_E, energy)[-1] / integrate.cumtrapz(dos_d_list_total, energy)[-1]
-            s_bandcenter_occ = integrate.cumtrapz(dos_s_list_E_occ, energy_occ)[-1] / integrate.cumtrapz(dos_s_list_total_occ, energy_occ)[-1]
-            p_bandcenter_occ = integrate.cumtrapz(dos_p_list_E_occ, energy_occ)[-1] / integrate.cumtrapz(dos_p_list_total_occ, energy_occ)[-1]
-            d_bandcenter_occ = integrate.cumtrapz(dos_d_list_E_occ, energy_occ)[-1] / integrate.cumtrapz(dos_d_list_total_occ, energy_occ)[-1]
-            band_center_dict = {}; band_center_dict_occ = {}
-            element = element_names[element_number]
-            band_center_dict[str(element)+"_s"] = "%3.3f" % s_bandcenter
-            band_center_dict[str(element)+"_p"] = "%3.3f" % p_bandcenter
-            band_center_dict[str(element)+"_d"] = "%3.3f" % d_bandcenter
-            band_center_dict_occ[str(element)+"_s_occ"] = "%3.3f" % s_bandcenter_occ
-            band_center_dict_occ[str(element)+"_p_occ"] = "%3.3f" % p_bandcenter_occ
-            band_center_dict_occ[str(element)+"_d_occ"] = "%3.3f" % d_bandcenter_occ
-            print band_center_dict
-            print band_center_dict_occ
-
-            if element == "O":
-                O_pband_values = open("O_pband_values.txt", "w")
-                O_pband_values_occ = open("O_pband_values_occ.txt", "w")
-                O_pband_values.write(str(band_center_dict[str(element)+"_p"]))
-                O_pband_values_occ.write(str(band_center_dict_occ[str(element)+"_p_occ"]))
-                O_pband_values.close()
-                O_pband_values_occ.close()
-            tm_list = ["Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au"]
-
-            for entry in tm_list:
-                if element == entry:
-                    filename = "TM_dband_values_%s.txt" % element
-                    TM_dband_values = open(filename, "w")
-                    filename = "TM_dband_values_occ_%s.txt" % element
-                    TM_dband_values_occ = open(filename, "w")
-                    TM_dband_values.write(str(band_center_dict[str(element)+"_d"]))
-                    TM_dband_values_occ.write(str(band_center_dict_occ[str(element)+"_d_occ"]))
-                    TM_dband_values.close()
-                    TM_dband_values_occ.close()
-
-        return band_center_dict, band_center_dict_occ
-
-    def _calc_effective_dos(self, temperature=1000):
-        boltz = 8.619*10**-5
-        E_VBM, E_CBM = self._calc_VBM_and_CBM()
-        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
-        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
-        dosdata, total_dos = self._cleanup_projected_dos()
-        # Take the total dos as separate up and down spin and combine to be summed total DOS
-        #total_dos = []
-        #for index in range(len(total_dos_up_list)):
-        #    total_dos.append(total_dos_up_list[index]+total_dos_down_list[index])
-
-        # Parse total DOS to VBM and CBM components
-        total_dos_VBM = []
-        energy_to_integrate_VBM = []
-        total_dos_CBM = []
-        energy_to_integrate_CBM = []
-        for index in range(len(energy)):
-            #if energy[index] <= E_VBM and energy[index] > E_VBM-10:
-            if energy[index] <= E_VBM:
-                total_dos_VBM.append(total_dos[index])
-                energy_to_integrate_VBM.append(energy[index])
-            #elif energy[index] > E_CBM and energy[index] < E_CBM+10:
-            elif energy[index] > E_CBM:
-                total_dos_CBM.append(total_dos[index])
-                energy_to_integrate_CBM.append(energy[index])
-            else:
-                continue
-
-        #print E_VBM
-        #print E_CBM
-        #print "energy_to_int_vbm", energy_to_integrate_VBM
-        #print "DOS_vbm", total_dos_VBM
-        #print "energy_to_int_cbm", energy_to_integrate_CBM
-        #print "DOS_cbm", total_dos_CBM
-
-        # Calculate the effective DOS of the valence band
-        VBM_effective_dos_integrand = []
-        for index in range(len(total_dos_VBM)):
-            VBM_effective_dos_integrand.append(total_dos_VBM[index]*np.exp(-1*(E_VBM-energy_to_integrate_VBM[index])/(boltz*temperature)))
-        VBM_effective_dos = integrate.cumtrapz(VBM_effective_dos_integrand, energy_to_integrate_VBM)[-1]
-        VBM_int = integrate.cumtrapz(total_dos_VBM, energy_to_integrate_VBM)[-1]
-
-        # Calculate the effective DOS of the conduction band
-        CBM_effective_dos_integrand = []
-        for index in range(len(total_dos_CBM)):
-            CBM_effective_dos_integrand.append(total_dos_CBM[index]*np.exp(-1*(energy_to_integrate_CBM[index]-E_CBM)/(boltz*temperature)))
-        CBM_effective_dos = integrate.cumtrapz(CBM_effective_dos_integrand, energy_to_integrate_CBM)[-1]
-        CBM_int = integrate.cumtrapz(total_dos_CBM, energy_to_integrate_CBM)[-1]
-
-        print "The effective DOS of the VB is:", VBM_effective_dos
-        print "The effective DOS of the CB is:", CBM_effective_dos
-        print "The integral of the VB DOS is:", VBM_int
-        print "The integral of the CB DOS is:", CBM_int
-
-        return VBM_effective_dos, CBM_effective_dos
-
-    def _analyze_projected_dos(self, get_band_centers=False, save_plot=False):
-        sumtotaldosup, sumtotaldosdown, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
-        energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
-        nedos = self._calc_nedos()
-        atom_amounts = PoscarAnalyzer(self.poscar).get_atom_amounts
-        element_names = PoscarAnalyzer(self.poscar).get_element_names
-
-        pyplot.figure(figsize=(8,6), dpi=80)
-        #Need to normalize and plot PDOS by element type
-
-        colors = "bgrkybgrkybgrkybgrkybgrky"
-        for element_number in range(len(atom_amounts)):
-            dos_to_plot_up = []
-            dos_to_plot_down = []
-            for index in range(nedos):
-                dos_to_plot_up.append((dos_s_list[index + nedos*element_number][0] + dos_p_list[index + nedos*element_number][0] + dos_d_list[index + nedos*element_number][0])/atom_amounts[element_number])
-                dos_to_plot_down.append(-1*(dos_s_list[index + nedos*element_number][1] + dos_p_list[index + nedos*element_number][1] + dos_d_list[index + nedos*element_number][1])/atom_amounts[element_number])
-            pyplot.plot(energy, dos_to_plot_up, color=colors[element_number], label='PDOS for %s' % (element_names[element_number]))
-            pyplot.plot(energy, dos_to_plot_down, color=colors[element_number])
-
-            if get_band_centers == bool(True):
-                self._calc_bandcenters(dos_s_list=dos_s_list, dos_p_list=dos_p_list, dos_d_list=dos_d_list, element_number=element_number)
-
-        pyplot.xlabel('Energy (E-EFermi, eV)')
-        pyplot.ylabel('Projected Densities of States (states/eV-atom)')
-        pyplot.title('Projected Density of States')
-        pyplot.legend()
-        pyplot.xlim([-10, 10])
-        pyplot.ylim([-5, 5])
-        if save_plot == bool(True):
-            pyplot.savefig('ProjectedDOS.pdf')
-            print "A plot of the Projected DOS has been saved!"
 
 class StabilityAnalyzer(object):
     """
