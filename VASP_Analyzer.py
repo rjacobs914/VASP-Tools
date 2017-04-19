@@ -18,16 +18,22 @@ import getpass
 import subprocess
 import logging
 import shutil
-from pymatgen.io.vasp.inputs import Poscar
 
 class PoscarAnalyzer(object):
-    """This class is used to obtain basic, useful quantities from the POSCAR file.
+    """Class used to obtain basic, useful quantities from the POSCAR file.
     args:
         poscar: (str), the name of a POSCAR file
-
-    Example usage:
-        pa = PoscarAnalyzer(poscar="POSCAR")
-        total_atoms = pa.get_total_atoms
+    instance methods:
+        get_element_names : (list) returns a list containing element names from POSCAR
+        get_atom_amounts : (list) returns a list containing atom numbers of each element from POSCAR
+        get_total_atoms : (int) returns total number of atoms in POSCAR
+        get_element_composition : (list) returns composition of each element, by normalizing the number of atoms of each
+            element by the total number of atoms in the system
+        get_lattice_parameters : (numpy array) returns array of lattice parameters, in Angstroms
+        get_cell_volume : (float) returns total volume of supercell
+        get_atom_positions_direct : (numpy array) returns positions of all atoms in supercell, in direct coordinates
+        get_atom_positions_cartesian : (numpy array) returns positions of all atoms in supercell, in units of Angstroms
+        get_atom_distances : (???) returns array containing distances of all atoms from all others
     """
     def __init__(self, poscar="POSCAR"):
         self.poscar = poscar
@@ -149,26 +155,14 @@ class PoscarAnalyzer(object):
 
         return atom_positions_array
 
-    def get_atom_distances(self, write_to_file=False):
-        # Make poscar into pymatgen structure object
-        structure = Poscar.from_file(self.poscar)
-        atom_distances = structure.distance_matrix
-        if write_to_file == bool(True):
-            distance_matrix_file = open("distance_matrix.txt", "w")
-            for index in range(len(atom_distances)):
-                distance_matrix_file.write(atom_distances[index])
-            distance_matrix_file.close()
-
-        return atom_distances
-
 class OutcarAnalyzer(object):
-    """This class is used to obtain basic, useful quantities from the OUTCAR file.
+    """Class used to obtain basic, useful quantities from the OUTCAR file.
     args:
         outcar: (str), the name of an OUTCAR file
-
-    Example usage:
-        oa = OutcarAnalyzer(outcar="OUTCAR")
-        fermi = oa.get_fermi_energy
+    instance methods:
+        get_fermi_energy: (float) returns the Fermi energy of the final ionic iteration of VASP run
+        get_dipole : (float) returns the dipole moment of the final ionic iteration of VASP run
+        get_bandgap : (float) returns the electronic band gap, computed from eigenvalues in OUTCAR
     """
     def __init__(self, outcar="OUTCAR"):
         self.outcar = outcar
@@ -259,15 +253,14 @@ class OutcarAnalyzer(object):
         return Egap
 
 class OszicarAnalyzer(object):
-    """
-    This class is used to obtain basic, useful quantities from the OSZICAR file.
+    """Class used to obtain basic, useful quantities from the OSZICAR file.
     args:
-        oszicar: (str), the name of an OSZICAR file
-        poscar: (str), a POSCAR file
-
-    Example usage:
-        oza = OszicarAnalyzer(oszicar="OSZICAR", poscar="POSCAR")
-        energy = oza.get_energy
+        oszicar: (str) the name of an OSZICAR file
+        poscar: (str) a POSCAR file
+    instance methods:
+        get_energy : (float) returns the DFT E0 value of the final ionic iteration
+        get_energy_per_atom : (float) returns the DFT E0 value of final ionic iteration, normalized to be per atom
+        get_total_magnetization : (float) returns the total converged magnetization of the system
     """
     def __init__(self, oszicar="OSZICAR", poscar="POSCAR"):
         self.oszicar = oszicar
@@ -315,7 +308,13 @@ class OszicarAnalyzer(object):
         return total_mag
 
 class DirectoryUtilities(object):
-
+    """Class used to perform some basic directory manipulation tasks.
+    args: None
+    static methods:
+        get_full_directory_list : (list) returns a list of all directories under the current working directory
+        get_downmost_directory_list : (list) returns a list of all directories under the current working directory, that
+            are at the bottom of the directory tree.
+    """
     @staticmethod
     def get_full_directory_list():
         #Get all directories, excluding the cwd
@@ -363,7 +362,9 @@ class DirectoryUtilities(object):
         return modified_directory_list
 
 class TimeUtilities(object):
+    """Class to perform basic time-related tasks. The user should not call any methods here
 
+    """
     @staticmethod
     def _parse_updated_time(last_updated_time):
         last_updated_month = last_updated_time[4:7]
@@ -421,7 +422,9 @@ class TimeUtilities(object):
         return file_update_time, file_update_time_difference
 
 class JobAnalyzer(object):
+    """Class to perform DFT job convergence analysis. The user should not call any methods here
 
+    """
     def __init__(self):
         pass
 
@@ -619,7 +622,9 @@ class JobAnalyzer(object):
         return nonstarted_job_dirs, old_job_dirs, current_job_dirs
 
 class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
+    """Class to perform DFT job monitoring tasks. The user should not call any methods here
 
+    """
     def __init__(self):
         super(JobMonitor, self).__init__()
 
