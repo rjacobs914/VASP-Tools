@@ -27,6 +27,7 @@ class PoscarAnalyzer(object):
         get_element_names : (list) returns a list containing element names from POSCAR
         get_atom_amounts : (list) returns a list containing atom numbers of each element from POSCAR
         get_total_atoms : (int) returns total number of atoms in POSCAR
+        get_composition_dict : (dict) returns dict of {"Element" : atom_number} for all species in POSCAR
         get_element_composition : (list) returns composition of each element, by normalizing the number of atoms of each
             element by the total number of atoms in the system
         get_lattice_parameters : (numpy array) returns array of lattice parameters, in Angstroms
