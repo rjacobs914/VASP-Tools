@@ -24,13 +24,11 @@ import warnings
 import math
 import numpy as np
 import re
-import os
-import sys
 from scipy import integrate
 import xlsxwriter
 
-class WulffWrapper(object):
-    """A wrapper class to the pymatgen Wulff analysis tools.
+class WulffAnalyzer(object):
+    """Class used to conduct Wulff construction analysis. Mainly relies on Wulff tools from pymatgen
     args:
         poscar: (str) The name of a POSCAR file
         miller_indices: (list of tuples) A list of miller indices, where each miller index is represented as a tuple.
@@ -922,8 +920,7 @@ class DoscarAnalyzer(object):
         return E_VBM, E_CBM
 
 class StabilityAnalyzer(object):
-    """
-    This class conducts a thermodynamic phase stability analysis using the values in the Materials Project database and
+    """Class that conducts a thermodynamic phase stability analysis using the values in the Materials Project database and
     includes as input the user's calculated material. By default, DFT energies are used for all elemental endmembers.
     However, the thermodynamic conditions represented by DFT are often not physically realistic. Because of this, the user
     can supply a custom set of calculated chemical potential values for gaseous endmembers like O and H. These chemical
@@ -935,119 +932,79 @@ class StabilityAnalyzer(object):
     class in the VASP_Setup module your GGA+U values will match that of the Materials Project. Just be sure to use GGA-PBE
     type pseudopotentials in your DFT calculations.
 
-    <Args>:
+    args:
         mapi_key : (str) Your Materials API key from Materials Project. You can obtain yours here: https://materialsproject.org/open
-        poscar: (str) the name of a POSCAR file
-        oszicar: (str) the name of an OSZICAR file
-        atoms_per_formula_unit: (int) the number of atoms constituting one formula unit of the material simulated
-        always_include_O : (bool) whether or not to always include O as an endmember in your phase diagram analysis,
-            even if your simulated material contains no O
-        always_include_H : (bool) whether or not to always include H as an endmember in your phase diagram analysis,
-            even if your simulated material contains no H
-    <Example usage>:
-        stability = StabilityAnalyzer(mapi_key="ABC", poscar="POSCAR", oszicar="OSZICAR", atoms_per_formula_unit=5, always_include_H=False)
-        stability.get_phase_diagram(use_custom_chem_pots=True, custom_chem_pot_dict={"O": -6.321})
+        poscar : (str) the name of a POSCAR file
+        oszicar : (str) the name of an OSZICAR file
+        get_data_from_VASP_files : (bool) whether to obtain composition and energy data from VASP runs. This is used to
+            calculate the stability of newly calculated DFT structures. If this is set to False, need to specify composition
+            and energy of material you want to examine manually with the composition_dict and composition_energy arguments
+        additional_elements_to_include : (list) A list of elements to include in phase stability analysis that aren't present
+            in your DFT calculation or that weren't manually included in the composition_dict argument
+        material_ids_to_remove : (list) A list of MP material id's (e.g. "mp-123") to remove from the phase space. Useful
+            to analyze metastable phases by removing certain stable phases
+        composition_dict : (list of dict) A list containing dicts of material compositions to analyze the stability of.
+            This is a way to manually set the composition of interest for an arbitrary composition
+        composition_energy : (list) A list of energies corresponding to each composition dict in composition_dict
+
+    instance methods:
+        get_phase_diagram: (phase diagram object) This function generates a phase diagram and calculates the stability
+            of the simulated compound
+            args:
+                use_custom_chem_pots : (bool) If False, the standard DFT endmember energies as tabulated in Materials Project
+                    are used. If True, the user must specify their own chemical potentials using the custom_chem_pot_dict input
+                custom_chem_pot_dict: (dict) A dictionary of {"element": chem_pot} pairs, where chem_pot is a float
+                include_organic_molecules: (bool) If True, a small library of DFT-calculated organic molecules is included
+                    in the phase diagram calculation. Note that they can only be included if C is an element in your POSCAR.
+                include_organic_molecule_shift: (bool) If True, adds an energy shift to the organic molecules consistent with
+                    T = 298 K and P = 10^-6 atm. Note this only applies if include_organic_molecules is set to True and you
+                    are interested in phase stability at 298 K. Use with Caution!
     """
-    def __init__(self, mapi_key, poscar, oszicar, atoms_per_formula_unit, always_include_O=False, always_include_H=False,
-                 additional_elements=None, compositions_to_remove=None, get_data_from_VASP_files=False, composition_dict = {}, composition_energy=None):
+    def __init__(self, mapi_key, poscar="POSCAR", oszicar="OSZICAR", get_data_from_VASP_files=False ,
+                 additional_elements_to_include=None, material_ids_to_remove=None, composition_dict=None,
+                 composition_energy=None):
         self.mapi_key = mapi_key
         self.poscar = poscar
         self.oszicar = oszicar
-        self.atoms_per_formula_unit = atoms_per_formula_unit
-        self.always_include_O = always_include_O
-        self.always_include_H = always_include_H
-        self.additional_elements = additional_elements
-        self.compositions_to_remove = compositions_to_remove
         self.get_data_from_VASP_files = get_data_from_VASP_files
+        self.additional_elements_to_include = additional_elements_to_include
+        self.material_ids_to_remove = material_ids_to_remove
         self.composition_dict = composition_dict
         self.composition_energy = composition_energy
 
-    def get_phase_diagram(self, use_custom_chem_pots=False, custom_chem_pot_dict=None,
-                          include_multiple_material_directories=False, material_directory_list=None, include_organic_molecules=False,
+
+    def get_phase_diagram(self, use_custom_chem_pots=False, custom_chem_pot_dict=None, include_organic_molecules=False,
                           include_organic_molecule_shift=False):
-        """
-        This function generates a phase diagram and calculates the stability of the simulated compound
-        <Args>:
-            use_custom_chem_pots : (bool) If False, the standard DFT endmember energies as tabulated in Materials Project
-                are used. If True, the user must specify their own chemical potentials using the custom_chem_pot_dict input
-            custom_chem_pot_dict: (dict) A dictionary of {"element": chem_pot} pairs, where chem_pot is a float
-            include_multiple_material_directories: (bool) If False, phase stability of material in current working directory
-                is analyzed. If True, need to specify list of directories to conduct stability analysis. The structures and
-                energies of the material in each directory will be included at the same time in the phase diagram. Useful
-                for examining competing stability between two or more newly calculated compounds.
-            material_directory_list: (list) A list of directories in order to add multiple newly calculated materials
-                to the phase stability analysis at the same time. Only used if include_multiple_material_directories is
-                set to True. For the directories, include the full path "/home/user/pathtomaterial"
-            include_organic_molecules: (bool) If True, a small library of DFT-calculated organic molecules is included
-                in the phase diagram calculation. Note that they can only be included if C is an element in your POSCAR.
-            include_organic_molecule_shift: (bool) If True, adds an energy shift to the organic molecules consistent with
-                T = 298 K and P = 10^-6 atm. Note this only applies if include_organic_molecules is set to True and you
-                are interested in phase stability at 298 K. Use with Caution!
-        <Returns>: A phase diagram object. Multiple text files with information on the stability of the simulated compound, the stable entries
-            on the phase diagram, and the decomposition products at the composition point of the simulated material
-        """
-        #pd_entry_list = []
-        pd_entry_list_to_analyze = []
 
-        if use_custom_chem_pots == False:
-            if include_multiple_material_directories == False:
-                entries_in_system = self._create_chemical_system_from_MP()
-                pd_entry_list = self._create_pdentry()
-                for entry in pd_entry_list:
-                    print "The PDEntry given for this system is:", entry, " eV/atom"
-                    pd_entry_list_to_analyze.append(entry)
-            if include_multiple_material_directories == True:
-                cwd = os.getcwd()
-                entries_in_system = self._create_chemical_system_from_MP()
-                for directory_path in material_directory_list:
-                    os.chdir(directory_path)
-                    pd_entry = self._create_pdentry()
-                    print "The PDEntry given for this system is:", pd_entry, " eV/form unit"
-                    #pd_entry_list.append(pd_entry)
-                    pd_entry_list_to_analyze.append(pd_entry)
-                    os.chdir(cwd)
+        pd_entry_list_chempots = []
 
-        if use_custom_chem_pots == True:
-            if include_multiple_material_directories == False:
-                entries_in_system = self._create_chemical_system_from_MP_and_remove_endmembers(species_to_remove=[key for key in custom_chem_pot_dict.iterkeys()])
-                pd_entry_list = self._create_pdentry()
-                for entry in pd_entry_list:
-                    #print "The PDEntry given for this system is:", entry, " eV/form unit"
-                    pd_entry_list_to_analyze.append(entry)
-            if include_multiple_material_directories == True:
-                cwd = os.getcwd()
-                entries_added = False
-                for directory_path in material_directory_list:
-                    os.chdir(directory_path)
-                    if entries_added == False:
-                        entries_in_system = self._create_chemical_system_from_MP()
-                        entries_added = True
-                    pd_entry = self._create_pdentry()
-                    print "The PDEntry given for this system is:", pd_entry, " eV/form unit"
-                    print "This PDEntry was obtained from directory", directory_path
-                    #pd_entry_list.append(pd_entry)
-                    pd_entry_list_to_analyze.append(pd_entry)
-                    os.chdir(cwd)
-            for key in custom_chem_pot_dict.iterkeys():
-                comp_string = str(key)+"1"
-                comp = Composition(comp_string)
-                energy = custom_chem_pot_dict[key] #This is the chemical potentials specified by the user.
-                pd_entry_new = PDEntry(comp, energy)
-                print "The PDEntry I've entered is:"
-                print pd_entry_new
-                pd_entry_list.append(pd_entry_new)
-                #entries_in_system.append(pd_entry_new)
+        if use_custom_chem_pots == bool(False):
+            entries_in_system = self._create_chemical_system_from_MP()
+            pd_entry_list = self._create_pdentry()
+            for entry in pd_entry_list:
+                print "The PDEntry given for this system is:", entry, " eV/cell"
 
-        # Need to add our current material as new pd_entry to the chemical system
-        #print "The PDEntry given for this system is:", pd_entry, " eV/form unit"
-        #pd_entry_list.append(pd_entry)
+        elif use_custom_chem_pots == bool(True):
+            entries_in_system = self._create_chemical_system_from_MP_and_remove_endmembers(species_to_remove=[key for key in custom_chem_pot_dict.keys()])
+            pd_entry_list = self._create_pdentry()
+            # Also make PDEntries for species you specify chem pots of
+            for key, value in custom_chem_pot_dict.items():
+                chempot_pdentry = PDEntry(composition=key, energy=value)
+                entries_in_system.append(chempot_pdentry)
+                pd_entry_list_chempots.append(chempot_pdentry)
+            for entry in pd_entry_list:
+                print "The PDEntry given for this system is:", entry, " eV/cell"
 
         # Add all new PDEntry objects from pd_entry_list to the chemical system for phase stability analysis
-        for entry in pd_entry_list:
-            entries_in_system.append(entry)
+        if len(pd_entry_list) > 0:
+            for entry in pd_entry_list:
+                entries_in_system.append(entry)
+        if len(pd_entry_list_chempots) > 0:
+            for entry in pd_entry_list_chempots:
+                entries_in_system.append(entry)
 
         # Add the organic molecule entries as PDEntries and entries in chemical system for phase diagram
-        if include_organic_molecules == True:
+        if include_organic_molecules == bool(True):
             organic_count = 0
             organic_compositions, organic_energies = self._add_organic_molecules(add_roomtemp_gas_shift=include_organic_molecule_shift)
             for index in range(len(organic_compositions)):
@@ -1063,24 +1020,26 @@ class StabilityAnalyzer(object):
         phasediagram_analyzer = PDAnalyzer(phasediagram)
 
         eabove_file = open("energy_above_hull.txt", "w")
+        eform_file = open("formation_energy.txt", "w")
         decomp_file = open("decomposition_products.txt", "w")
         stable_entries_file = open("stable_entries.txt", "w")
 
-        for entry in pd_entry_list_to_analyze:
+        for entry in pd_entry_list:
             print "Analyzing entry:", entry
-            energy_above_hull = phasediagram_analyzer.get_e_above_hull(entry)
+            energy_above_hull = phasediagram_analyzer.get_e_above_hull(entry=entry)
             energy_above_hull *= 1000 # in units of meV/atom
             print "The energy above hull (in meV/atom) for this system is:", energy_above_hull
-            if include_multiple_material_directories == False:
-                eabove_file.write(str(energy_above_hull)+"\n")
-            if include_multiple_material_directories == True:
-                eabove_file.write(str(energy_above_hull)+"\n")
+            eabove_file.write(str(energy_above_hull)+"\n")
+            e_form = phasediagram.get_form_energy_per_atom(entry=entry)
+            #e_form *= 1000 # in units of meV/atom
+            print "The formation energy (in eV/atom) for this system is:", e_form
+            eform_file.write(str(e_form)+"\n")
 
         # Write the stable entries to a file
         for entry in phasediagram.stable_entries:
-            if entry not in pd_entry_list:
+            if entry not in pd_entry_list and entry not in pd_entry_list_chempots:
                 stable_entries_file.write(str(entry.composition.reduced_formula)+" "+str(entry.entry_id)+"\n")
-            if entry in pd_entry_list:
+            if entry in pd_entry_list or entry in pd_entry_list_chempots:
                 stable_entries_file.write(str(entry)+"\n")
 
         # Write the decomposition products and fractions of each phase for inserted PDEntry to file
@@ -1092,6 +1051,7 @@ class StabilityAnalyzer(object):
                 decomp_file.write("\n")
 
         eabove_file.close()
+        eform_file.close()
         decomp_file.close()
         stable_entries_file.close()
 
@@ -1102,47 +1062,41 @@ class StabilityAnalyzer(object):
         # to (1) use the same XC-functional as MP (PAW-PBE), and (2) use same U values for GGA+U calculations. The
         # shifts done here correspond to certain U values used by MP, which are the same U values used in the
         # VASP_Setup module.
-        energy_per_fu_list = []
+        energy_list = []
         energy_shift_dict = {"V": 1.682, "Cr": 2.013, "Mn": 1.681, "Fe": 2.733, "Co": 1.874, "Ni": 2.164, "O": 0.7023}
 
-        if self.get_data_from_VASP_files == True:
-            pa = PoscarAnalyzer(poscar=self.poscar, atoms_per_formula_unit=self.atoms_per_formula_unit)
-            oa = OszicarAnalyzer(oszicar=self.oszicar, poscar=self.poscar, atoms_per_formula_unit=self.atoms_per_formula_unit)
-            #energy_per_atom = oa.get_energy_per_atom
-            energy_per_fu = oa.get_energy_per_formula_unit
-            formula_unit_dict = pa.get_formula_unit_as_dict
-            print "The unshifted energy per fu is:", energy_per_fu
+        if self.get_data_from_VASP_files == bool(True):
+            pa = PoscarAnalyzer(poscar=self.poscar)
+            oa = OszicarAnalyzer(oszicar=self.oszicar, poscar=self.poscar)
+            energy = oa.get_energy()
+            composition_dict = pa.get_composition_dict()
+            print "The unshifted energy per cell is:", energy
             # Find which elements in material correspond to those that need shifting, if any, and apply energy shift
-            for key in formula_unit_dict.iterkeys():
-                if key in energy_shift_dict.iterkeys():
-                    #print "found element type %s" % str(key)
-                    energy_per_fu -= energy_shift_dict[key]*formula_unit_dict[key]
-                    #energy_per_atom -= energy_shift_dict[key]*formula_unit_dict[key]
-            print "The shifted energy per fu is:", energy_per_fu
-            energy_per_fu_list.append(energy_per_fu)
+            for key in composition_dict.keys():
+                if key in energy_shift_dict.keys():
+                    energy -= energy_shift_dict[key]*composition_dict[key]
+            print "The shifted energy per cell is:", energy
+            energy_list.append(energy)
 
-        elif self.get_data_from_VASP_files == False:
+        elif self.get_data_from_VASP_files == bool(False):
             if len(self.composition_energy) > 0:
                 for index, entry in enumerate(self.composition_energy):
-                    energy_per_fu = entry
-                    print "The unshifted energy per fu is:", energy_per_fu
+                    energy = entry
+                    print "The unshifted energy is:", energy
 
                     # Find which elements in material correspond to those that need shifting, if any, and apply energy shift
-                    for key in self.composition_dict[index].iterkeys():
-                        if key in energy_shift_dict.iterkeys():
-                            #print "found element type %s" % str(key)
-                            energy_per_fu -= energy_shift_dict[key]*self.composition_dict[index][key]
-                            #energy_per_atom -= energy_shift_dict[key]*formula_unit_dict[key]
-                    print "The shifted energy per fu is:", energy_per_fu
-                    energy_per_fu_list.append(energy_per_fu)
+                    for key in self.composition_dict[index].keys():
+                        if key in energy_shift_dict.keys():
+                            energy -= energy_shift_dict[key]*self.composition_dict[index][key]
+                    print "The shifted energy is:", energy
+                    energy_list.append(energy)
 
-        return energy_per_fu_list
+        return energy_list
 
     def _create_chemical_system_from_MP(self):
         mp = MPRester(self.mapi_key)
-        pa = PoscarAnalyzer(poscar=self.poscar, atoms_per_formula_unit=self.atoms_per_formula_unit)
-        element_names = pa.get_element_names
-        #print element_names
+        pa = PoscarAnalyzer(poscar=self.poscar)
+        element_names = pa.get_element_names()
 
         # Remove redundant elements from element_names list
         elements_reduced = []
@@ -1153,20 +1107,13 @@ class StabilityAnalyzer(object):
         element_names = []
         for entry in elements_reduced:
                 element_names.append(entry)
-        #print element_names
 
-        if self.always_include_H == True:
-            if "H" not in element_names:
-                print "H is being added to the list of elements ..."
-                element_names.append("H")
-        if self.always_include_O == True:
-            if "O" not in element_names:
-                print "O is being added to the list of elements ..."
-                element_names.append("O")
-        for entry in self.additional_elements:
-            if entry not in element_names:
-                print "%s is being added to the list of elements ..." % str(entry)
-                element_names.append(entry)
+        if self.additional_elements_to_include is not None:
+            if len(self.additional_elements_to_include) > 0:
+                for entry in self.additional_elements_to_include:
+                    if entry not in element_names:
+                        print "%s is being added to the list of elements ..." % str(entry)
+                        element_names.append(entry)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -1177,21 +1124,18 @@ class StabilityAnalyzer(object):
 
     def _create_pdentry(self):
         pd_entry_list = []
-        energy_per_fu_list = self._calc_GGA_GGAU_shifted_energy()
-        if self.get_data_from_VASP_files == True:
-            pa = PoscarAnalyzer(poscar=self.poscar, atoms_per_formula_unit=self.atoms_per_formula_unit)
-            formula_unit_dict = pa.get_formula_unit_as_dict
-            #energy_per_fu_list = self._calc_GGA_GGAU_shifted_energy()
-            comp = Composition(formula_unit_dict)
-            pd_entry = PDEntry(comp, energy_per_fu_list[0])
+        energy_list = self._calc_GGA_GGAU_shifted_energy()
+        if self.get_data_from_VASP_files == bool(True):
+            pa = PoscarAnalyzer(poscar=self.poscar)
+            composition_dict = pa.get_composition_dict()
+            comp = Composition(composition_dict)
+            pd_entry = PDEntry(comp, energy_list[0])
             pd_entry_list.append(pd_entry)
-        elif self.get_data_from_VASP_files == False:
+        elif self.get_data_from_VASP_files == bool(False):
             for index, composition in enumerate(self.composition_dict):
                 comp = Composition(composition)
-                #energy_per_fu = self._calc_GGA_GGAU_shifted_energy()
-                energy_per_fu = energy_per_fu_list[index]
-                pd_entry = PDEntry(comp, energy_per_fu)
-                print "The PDEntry given for this system is:", pd_entry, " eV/form unit"
+                pd_entry = PDEntry(comp, energy_list[index])
+                print "The PDEntry given for this system is:", pd_entry, " eV/cell"
                 pd_entry_list.append(pd_entry)
         return pd_entry_list
 
@@ -1202,17 +1146,13 @@ class StabilityAnalyzer(object):
         want to use the DFT value of the O chemical potential (which is unrealistically oxidizing), then the user can
         have the O endmember entries removed and insert their own O chemical potential value
 
-        <Args>
+        args:
             species_to_remove: list of elements to remove from entries list, e.g. ["O", "H"] will remove all O and H
                                 end members so that the user can specify their own end member energies (for instance,
                                 as a realistic chemical potential value). Viable elements to remove are:
                                 [O, H, N, F, Cl, Br, I]
-        <Returns>
-            entries_in_system: a list of chemical entries in the system used to do phase stability analysis, modified
-                                by removing the elements provided by the user.
-
         """
-        entries_in_system= self._create_chemical_system_from_MP()
+        entries_in_system = self._create_chemical_system_from_MP()
         pd_entry = self._create_pdentry()
 
         # Remove the MP entries for elements specified by user. Need to loop multiple times over all entries in the
@@ -1239,17 +1179,18 @@ class StabilityAnalyzer(object):
                             count += 1
 
         # Remove material compositions specified by the user
-        if len(self.compositions_to_remove) > 0:
-            for entry in self.compositions_to_remove:
-                for mpentry in entries_in_system:
-                    if mpentry.entry_id == entry:
-                        print "removing material %s" % mpentry.entry_id
-                        entries_in_system.remove(mpentry)
+        if self.material_ids_to_remove is not None:
+            if len(self.material_ids_to_remove) > 0:
+                for entry in self.material_ids_to_remove:
+                    for mpentry in entries_in_system:
+                        if mpentry.entry_id == entry:
+                            print "removing material %s" % mpentry.entry_id
+                            entries_in_system.remove(mpentry)
 
         return entries_in_system
 
     def _add_organic_molecules(self, add_roomtemp_gas_shift=False):
-        element_names = PoscarAnalyzer(poscar="POSCAR").get_element_names
+        element_names = PoscarAnalyzer(self.poscar).get_element_names()
         list_of_organic_compositions = []
         list_of_organic_energies = []
 
@@ -1348,7 +1289,7 @@ class StabilityAnalyzer(object):
         organic_compositions = []
         organic_energies = []
         for index in range(len(list_of_organic_compositions)):
-            for entry1, entry2 in itertools.izip(list_of_organic_compositions[index], list_of_organic_energies[index]):
+            for entry1, entry2 in zip(list_of_organic_compositions[index], list_of_organic_energies[index]):
                 organic_compositions.append(entry1)
                 organic_energies.append(entry2)
 
