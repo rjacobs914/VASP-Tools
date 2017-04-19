@@ -12,7 +12,7 @@ Instead, the VASP_PostProcessing and VASP_Setup modules draw upon the functions 
 import re
 import numpy as np
 import os
-import xlsxwriter
+import json
 import time
 import getpass
 import subprocess
@@ -787,92 +787,48 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
                     continue
         return resubmitted_crashed_job_dirs
 
-class VASPDataCollector(object):
-    """This class is used to collecting basic VASP output data into a spreadsheet.
+class VASPMetadata(object):
+    """Class used to collect VASP job analysis and postprocessing data (e.g. Fermi level, band center, etc.) and write
+    it to json file for each job directory. Also contains a utility to write all desired metadata to spreadsheet
     args:
-        poscar: (str), the name of a POSCAR file
-        outcar: (str), the name of an OUTCAR file
-        oszicar: (str), the name of an OSZICAR file
-        parent_directory: (str), the name of the parent directory from which to conduct the analysis. If None, will use
-        current working directory
-    Example usage:
-        dc = VASPDataCollector(poscar="POSCAR", outcar="OUTCAR", oszicar="OSZICAR", parent_directory="/home/user/myjobs/")
-        dc.get_data_spreadsheet
+        metadatafile : (json) A file containing VASP job analysis and postprocessing metadata
+    instance methods:
+        xxx: xxx
     """
-    def __init__(self, poscar="POSCAR", outcar="OUTCAR", oszicar="OSZICAR", parent_directory=None):
-        self.poscar = poscar
-        self.outcar = outcar
-        self.oszicar = oszicar
-        self.parent_directory = parent_directory
-        if parent_directory is None:
-            parent_directory = os.getcwd()
+    def __init__(self, metadatafile = "metadata.json"):
+        self.metadatafile = metadatafile
 
-    @property
-    def get_data_spreadsheet(self):
-        """
-        <Returns>: Instead of returning an object, this method creates a spreadsheet in the working directory containing
-        the directory name, composition info, and basic VASP info such as total atoms, energy, fermi energy, dipole,
-        cell volume, etc. and saves the file in the directory it is run in.
-        <Type>: None, writes xlsx file
-        """
-        return self._collect_job_data_to_spreadsheet()
+    def collect_basic_metadata(self):
+        # Currently just testing this functionality
+        directory = os.getcwd()
+        pa = PoscarAnalyzer()
+        elements = pa.get_element_names()
+        if os.path.exists(directory+"/"+str(self.metadatafile)):
+            metadata = open(self.metadatafile, "w")
+            json.dump({directory: {"Elements": elements} }, metadata)
+            metadata.close()
+        return None
 
-    def _collect_job_data_to_spreadsheet(self):
-        os.chdir(self.parent_directory)
-        excel_file = xlsxwriter.Workbook('job_data_collected.xlsx')
-        excel_sheet = excel_file.add_worksheet('collected data')
+    def _create_metadata_file(self):
+        cwd = os.getcwd()
+        if not os.path.exists(cwd+"/"+str(self.metadatafile)):
+            metadata = open(str(self.metadatafile), "w")
+            metadata.close()
+        else:
+            pass
+        return None
+
+    """
+    def _write_metadata_to_spreadsheet(self, directory_list):
+        cwd = os.getcwd()
+        excel_file = xlsxwriter.Workbook('metadata_collected.xlsx')
+        excel_sheet = excel_file.add_worksheet('collected metadata')
         bold = excel_file.add_format({'bold': True})
-        dirlist = DirectoryUtilities()._get_downmost_directory_list()
-        column_name_dict = {"0" : "Run", "1" : "Material", "2" : "Number of atoms", "3" : "Energy (eV/cell)",
-                            "4" : "Fermi level (eV)", "5" : "Dipole (eV-A)", "6" : "Volume (A^3)"}
+        column_name_dict = {"0":"Directory", "1":"Material Composition", "2":"Number of atoms", "3":"Energy (eV/cell)",
+                            "4":"Stability (meV/atom)", "5":"Fermi energy (eV)", "6":"Band gap (eV)"}
         row = 0
         for key, value in column_name_dict.iteritems():
-            #print row, key, value
             excel_sheet.write(int(row), int(key), value, bold)
-
-        row = 1
-        for directory in dirlist:
-            #if directory != self.parent_directory:
-            #print directory
-            #print row
-            os.chdir(directory)
-
-            # Detect if a directory has the needed files. If not, just pass through:
-            try:
-                ps = PoscarAnalyzer(poscar=self.poscar)
-                oa = OutcarAnalyzer(outcar=self.outcar)
-                oza = OszicarAnalyzer(oszicar=self.oszicar, poscar=self.poscar)
-                atom_amounts = ps.get_atom_amounts
-                element_names = ps.get_element_names
-                total_atoms = ps.get_total_atoms
-            except(IOError, IndexError):
-                atom_amounts = "n/a"
-                element_names = "n/a"
-                total_atoms = "n/a"
-
-            run = os.getcwd()
-            material = str()
-
-            # Detect if a job successfully wrote the following quantities (may not be written if job crashed):
-            try:
-                dipole = oa.get_dipole
-                fermi = oa.get_fermi_energy
-                energy = oza.get_energy
-                volume = ps.get_cell_volume
-            except(IndexError, IOError):
-                dipole = "n/a"
-                fermi = "n/a"
-                energy = "n/a"
-                volume = "n/a"
-
-            for index in range(len(element_names)):
-                material += str(element_names[index])+str(atom_amounts[index])
-            values_dict = {"0" : run, "1" : material, "2" : total_atoms, "3" : energy,
-                "4" : fermi, "5" : dipole, "6" : volume}
-            for key, value in values_dict.iteritems():
-                #print "writing row, column, value to spreadsheet:", row, key, value
-                os.chdir(self.parent_directory)
-                excel_sheet.write(int(row), int(key), value)
-            row += 1
-
         excel_file.close()
+        return None
+    """
