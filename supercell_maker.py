@@ -66,12 +66,11 @@ def main():
     mapi_key = os.environ['MAPI_KEY']
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if use_existing_poscar == False:
-            make_psr = PoscarFileSetup(material=str(material), mapi_key=mapi_key)
-            make_psr.get_poscar_file
-    mod_psr = PoscarFileModifier(poscar_in="POSCAR", poscar_out="POSCAR_supercell")
+        if use_existing_poscar == bool(False):
+            make_psr = PoscarFileSetup(material_composition=material, mapi_key=mapi_key, get_only_most_stable_structure=True)
+            make_psr.write_poscar_file()
+    mod_psr = PoscarFileModifier(poscar="POSCAR")
     mod_psr.make_poscar_supercell(scaling_matrix=scaling_matrix)
-    print "Your supercell has been made!"
 
 if __name__ == "__main__":
     main()
