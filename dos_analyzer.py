@@ -61,7 +61,7 @@ calculate_bandcenters = True
 write_bandcenters_to_file = True
 
 # Specify whether or not to calculate the oxygen charge transfer gap (only relevant for systems containing oxygen) (True/False)
-calculate_charge_transfer_gap = True
+calculate_charge_transfer_gap = False
 
 # Specify whether or not to calculate the effective densities of states of the valence and conduction bands
 calculate_effective_dos = True
@@ -75,17 +75,17 @@ from VASP_PostProcessing import DoscarAnalyzer
 dos = DoscarAnalyzer(poscar="POSCAR", incar="INCAR", outcar="OUTCAR", doscar="DOSCAR")
 
 def main():
-    if plot_total_dos == True:
+    if plot_total_dos == bool(True):
         dos.plot_total_dos()
-    if plot_projected_dos == True:
+    if plot_projected_dos == bool(True):
         dos.plot_projected_dos()
-    if calculate_bandcenters == True:
+    if calculate_bandcenters == bool(True):
         dos.get_bandcenters(write_dicts_to_file=write_bandcenters_to_file)
-    if calculate_bandgap == True:
+    if calculate_bandgap == bool(True):
         dos.get_bandgap_from_dos()
-    if calculate_charge_transfer_gap == True:
+    if calculate_charge_transfer_gap == bool(True):
         dos.get_O_chargetransfergap()
-    if calculate_effective_dos == True:
+    if calculate_effective_dos == bool(True):
         dos.get_effective_dos(temperature=effective_dos_temperature)
 
 if __name__=="__main__":
