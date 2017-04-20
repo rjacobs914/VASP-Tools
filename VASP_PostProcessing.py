@@ -115,12 +115,12 @@ class LocpotAnalyzer(object):
         return planaravg
 
     def get_workfunction(self):
-        fermi_energy = OutcarAnalyzer(self.outcar).get_fermi_energy
+        fermi_energy = OutcarAnalyzer(self.outcar).get_fermi_energy()
         vacuum_energy_top = self.get_vacuum_energy(surface="Top")
         vacuum_energy_bottom = self.get_vacuum_energy(surface="Bottom")
         workfunction_top = vacuum_energy_top-fermi_energy
         workfunction_bottom = vacuum_energy_bottom-fermi_energy
-        return (workfunction_top, workfunction_bottom)
+        return (workfunction_top, workfunction_bottom, vacuum_energy_top, vacuum_energy_bottom)
 
     def get_vacuum_energy(self, surface):
         Nx, Ny, Nz, z_coord, LOCPOTdata_column = self._parse_locpot()
