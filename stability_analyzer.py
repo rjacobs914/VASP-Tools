@@ -49,9 +49,18 @@ at your terminal:
 ########################################################################################################################
 ########################################################################################################################
 
-####################################################
-# Required entries are below, with examples provided
-####################################################
+# If you want to analyze the stability of a material you simulated with DFT, set to True. If set to False, need to
+# specify your own material composition and energy
+analyze_data_from_VASP_run = True
+
+# If analyze_data_from_VASP_run = False, specify values for the arguments below:
+custom_composition_dictionary = None # e.g., [{"La":2, "O":3} , {"La":1, "Mn":1, "O":3}]
+custom_energy_list = None # e.g., [-100, -90, -526]
+
+# If you want to remove certain materials from the Materials Project database, so they aren't considered in the stability
+# analysis, provide a list of their material id's here
+
+material_ids_to_remove = None # e.g. ["mp-123", "mp-12345"]
 
 # If you just want to use DFT energies and not incorporate other specific chemical potential values, set this to False.
 # If you want to specify your own chemical potentials of gaseous species to correspond to some type of environmental
@@ -59,49 +68,28 @@ at your terminal:
 
 use_my_own_chemical_potentials = True
 
-# Specify the number of atoms per formula unit of your material. (E.g. for SrTiO3, number_of_atoms_per_formula_unit = 5,
-# for UO2, number_of_atoms_per_formula_unit = 3)
-
-number_of_atoms_per_formula_unit = 5
-
-# Specify whether you want to include multiple newly calculated materials in your stability analysis. This is used to,
-# for example, test whether a material is stable in the presence of competing phases. If you just want to perform stability
-# analysis in the current working directory on one material, set this to False.
-
-analyze_stability_for_multiple_materials = False
-
-# If you want to test stability for multiple new materials at once (analyze_stability_for_multiple_materials = True above),
-# then provide list of directories where materials data is located. Provide the full path in each case, e.g.
-# list_of_directories_to_analyze = ["/home/user/materials_to_analyze/material1", "/home/user/materials_to_analyze/material2"]
-
-list_of_directories_to_analyze = []
-
-##########################################################
-
 # If you have specified use_my_own_chemical_potentials = True above, you must set the additional following parameters
 
 # Set which species you want to calculate the chemical potential of, in the form of a list of strings. For example,
 # ["O", "H"]
 
-species_of_chemical_potential = ["O"]
+species_of_chemical_potential = ["O", "H"]
 
 # Set the temperature (in K) of the environment to calculate the chemical potential at
 
-temperature = 1200
+temperature = 1073
 
 # Set the partial pressure (in atm) of the species to calculate the chemical potential at
 
-partial_pressure_of_species = 10**-9
+partial_pressure_of_species = 0.2
 
-
-##########################################################
-
+########################################################################################################################
 # If you are calculating the chemical potential of H specifically, there are a couple other variables to set:
 
 # Specifies whether or not to calculate H chemical potential as being in equilibrium with H2O. True = equilibrium with
 # H2O. False = H2 gas
 
-calc_H_chem_pot_H2Oequil = False
+calc_H_chem_pot_H2Oequil = True
 
 # If specifying calc_H_chem_pot_H2Oequil = True, you must specify what relative humidity (RH) of H2O vapor you want.
 # 0 = 0% RH, 1 = 100% RH.
@@ -114,50 +102,47 @@ relative_humidity_H2Oequil = 1
 oxygen_pressure_H2Oequil = 0.2
 
 ########################################################################################################################
+# If performing calculations where you want a set of organic molecule energies considered, set this to true
+include_organic_molecules = False
+
+# If include_organic_molecules = True, decide if you want to apply energy shift to molecules
+include_organic_molecule_energy_shift = False
+
+########################################################################################################################
 ########################################################################################################################
 
-from VASP_PostProcessing import *
+from VASP_PostProcessing import StabilityAnalyzer, ChemicalPotentialAnalyzer
 import os
 
 mapi_key = os.environ['MAPI_KEY']
 
 def main():
-    if use_my_own_chemical_potentials == True:
+    if use_my_own_chemical_potentials == bool(True):
         custom_chem_pot_dict = {}
         for entry in species_of_chemical_potential:
             if entry == "O":
                 O_chem_pot = ChemicalPotentialAnalyzer(temperature=temperature, pressure=partial_pressure_of_species,
-                                                       functional="PBE", energy_shift=False).get_O_chem_pot
+                                                       functional="PBE", energy_shift=False).get_O_chem_pot()
                 custom_chem_pot_dict["O"]=O_chem_pot
             if entry == "H":
                 if calc_H_chem_pot_H2Oequil == True:
                     H_chem_pot = ChemicalPotentialAnalyzer(temperature=temperature, pressure=partial_pressure_of_species,
                                                            functional="PBE", energy_shift=False, relative_humidity=relative_humidity_H2Oequil,
-                                                           pressure_O2_forH2O=oxygen_pressure_H2Oequil).get_H_chem_pot_fromH2O
+                                                           pressure_O2_forH2O=oxygen_pressure_H2Oequil).get_H_chem_pot_fromH2O()
                     custom_chem_pot_dict["H"]=H_chem_pot
                 if calc_H_chem_pot_H2Oequil == False:
                     H_chem_pot = ChemicalPotentialAnalyzer(temperature=temperature, pressure=partial_pressure_of_species,
-                                                           functional="PBE", energy_shift=False).get_H_chem_pot
+                                                           functional="PBE", energy_shift=False).get_H_chem_pot()
                     custom_chem_pot_dict["H"]=H_chem_pot
 
-        if "O" in species_of_chemical_potential:
-            include_O = True
-        if "H" in species_of_chemical_potential:
-            include_H = True
-        stability = StabilityAnalyzer(mapi_key=mapi_key, poscar="POSCAR", oszicar="OSZICAR",
-                                      atoms_per_formula_unit=number_of_atoms_per_formula_unit, always_include_O=include_O, always_include_H=include_H)
-        stability.get_phase_diagram(use_custom_chem_pots=True, custom_chem_pot_dict=custom_chem_pot_dict,
-                                    include_multiple_material_directories=analyze_stability_for_multiple_materials,
-                                    material_directory_list=list_of_directories_to_analyze, include_organic_molecules=False,
-                                    include_organic_molecule_shift=False)
+    elif use_my_own_chemical_potentials == bool(False):
+        custom_chem_pot_dict = None
 
-    if use_my_own_chemical_potentials == False:
-        stability = StabilityAnalyzer(mapi_key=mapi_key, poscar="POSCAR", oszicar="OSZICAR",
-                                      atoms_per_formula_unit=number_of_atoms_per_formula_unit)
-        stability.get_phase_diagram(use_custom_chem_pots=False, custom_chem_pot_dict={},
-                                    include_multiple_material_directories=analyze_stability_for_multiple_materials,
-                                    material_directory_list=list_of_directories_to_analyze, include_organic_molecules=False,
-                                    include_organic_molecule_shift=False)
+    stability = StabilityAnalyzer(mapi_key=mapi_key, poscar="POSCAR", oszicar="OSZICAR", get_data_from_VASP_files=analyze_data_from_VASP_run,
+                 additional_elements_to_include=species_of_chemical_potential, material_ids_to_remove=material_ids_to_remove,
+                                      composition_dict=custom_composition_dictionary, composition_energy=custom_energy_list)
+    stability.get_phase_diagram(use_custom_chem_pots=use_my_own_chemical_potentials, custom_chem_pot_dict=custom_chem_pot_dict,
+                                    include_organic_molecules=include_organic_molecules, include_organic_molecule_shift=include_organic_molecule_energy_shift)
 
 if __name__=="__main__":
     main()
