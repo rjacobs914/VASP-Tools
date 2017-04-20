@@ -121,17 +121,18 @@ def main():
     mapi_key = os.environ['MAPI_KEY']
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if use_existing_poscar == False:
-            make_psr = PoscarFileSetup(material=str(material), mapi_key=mapi_key)
-            make_psr.get_poscar_file
-    mod_psr = PoscarFileModifier(poscar_in="POSCAR", poscar_out="POSCAR_mod")
+        if use_existing_poscar == bool(False):
+            make_psr = PoscarFileSetup(material_composition=material, mapi_key=mapi_key, get_only_most_stable_structure=True)
+            make_psr.write_poscar_file()
+    mod_psr = PoscarFileModifier(poscar="POSCAR")
     mod_psr.make_poscar_supercell(scaling_matrix=scaling_matrix)
-    mod_psr.make_poscar_slab(hkl=surface_miller_index, min_thick=surface_slab_thickness, min_vac=vacuum_region_thickness, shift_slab_to_bottom=shift_slab_to_bottom)
-    if trim_layers_from_slab == True:
-        mod_psr.trim_poscar_slab(surface_trimming_dictionary={"Top": number_of_top_layers_to_remove, "Bottom": number_of_bottom_layers_to_remove})
-    if apply_selective_dynamics == True:
-        mod_psr.selective_dynamics(number_of_layers=number_of_layers_to_relax, top_and_bottom = relax_top_and_bottom)
-    print "Your surface has been made!"
+    mod_psr.make_poscar_slab(surface_hkl=surface_miller_index, minimum_thickness=surface_slab_thickness,
+                             minimum_vacuum=vacuum_region_thickness, shift_slab_to_bottom=shift_slab_to_bottom)
+    if trim_layers_from_slab == bool(True):
+        surface_trimming_dict = {"Top": number_of_top_layers_to_remove, "Bottom": number_of_bottom_layers_to_remove}
+        mod_psr.trim_poscar_slab(surface_trimming_dict=surface_trimming_dict)
+    if apply_selective_dynamics == bool(True):
+        mod_psr.add_selective_dynamics(number_of_layers=number_of_layers_to_relax, top_and_bottom=relax_top_and_bottom)
 
 if __name__ == "__main__":
     main()
