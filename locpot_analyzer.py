@@ -66,21 +66,24 @@ calculate_delta_work_function_helmholtz = False
 ########################################################################################################################
 ########################################################################################################################
 
-from VASP_PostProcessing import *
+from VASP_PostProcessing import LocpotAnalyzer
+from VASP_Analyzer import OutcarAnalyzer
 import logging
 
 def main():
     # Create log file
     logging.basicConfig(filename='locpot_analysis.log', level=logging.INFO)
 
-    loc = SurfacePotentialAnalyzer(poscar="POSCAR", outcar="OUTCAR", locpot="LOCPOT")
+    loc = LocpotAnalyzer(poscar="POSCAR", outcar="OUTCAR", locpot="LOCPOT")
+    oa = OutcarAnalyzer(outcar="OUTCAR")
 
-    if plot_electrostatic_potential == True:
-        loc.get_electrostatic_plot
+    if plot_electrostatic_potential == bool(True):
+        loc.get_electrostatic_potential()
         logging.info('The electrostatic potential energy plot and data have been saved!')
 
-    if calculate_work_function == True:
-        (fermi_energy, vacuum_energy_top, vacuum_energy_bot, work_function_top, work_function_bot) = loc.get_workfunction
+    if calculate_work_function == bool(True):
+        (work_function_top, work_function_bot, vacuum_energy_top, vacuum_energy_bot) = loc.get_workfunction()
+        fermi_energy = oa.get_fermi_energy()
         # Write results to log
         logging.info('The fermi energy of the system is %3.3f' % (fermi_energy))
         logging.info('The vacuum energy of the top surface is %3.3f eV' % (vacuum_energy_top))
@@ -88,8 +91,8 @@ def main():
         logging.info('The work function of the top surface is %3.3f eV' % (work_function_top))
         logging.info('The work function of the bottom surface is %3.3f eV' % (work_function_bot))
 
-    if calculate_delta_work_function_helmholtz == True:
-        delta_workfunction = loc.get_empirical_delta_workfunction
+    if calculate_delta_work_function_helmholtz == bool(True):
+        delta_workfunction = loc.get_empirical_delta_workfunction()
         logging.info('The Helmholtz equation gives an empirical work function difference between top and bottom surface of %3.3f eV' % (delta_workfunction))
 
 if __name__=="__main__":
