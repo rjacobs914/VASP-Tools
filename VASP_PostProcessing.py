@@ -994,6 +994,8 @@ class StabilityAnalyzer(object):
                 pd_entry_list_chempots.append(chempot_pdentry)
             for entry in pd_entry_list:
                 print "The PDEntry given for this system is:", entry, " eV/cell"
+            for entry in pd_entry_list_chempots:
+                print "The PDEntry of new chemical potential is:", entry, " eV"
 
         # Add all new PDEntry objects from pd_entry_list to the chemical system for phase stability analysis
         if len(pd_entry_list) > 0:

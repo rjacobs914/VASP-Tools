@@ -114,14 +114,15 @@ include_organic_molecule_energy_shift = False
 from VASP_PostProcessing import StabilityAnalyzer, ChemicalPotentialAnalyzer
 import os
 
-mapi_key = os.environ['MAPI_KEY']
+#mapi_key = os.environ['MAPI_KEY']
+mapi_key = "TtAHFCrZhQa7cwEy"
 
 def main():
     if use_my_own_chemical_potentials == bool(True):
         custom_chem_pot_dict = {}
         for entry in species_of_chemical_potential:
             if entry == "O":
-                O_chem_pot = ChemicalPotentialAnalyzer(temperature=temperature, pressure=partial_pressure_of_species,
+                O_chem_pot, H, S = ChemicalPotentialAnalyzer(temperature=temperature, pressure=partial_pressure_of_species,
                                                        functional="PBE", energy_shift=False).get_O_chem_pot()
                 custom_chem_pot_dict["O"]=O_chem_pot
             if entry == "H":
