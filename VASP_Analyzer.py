@@ -829,10 +829,11 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
         return resubmitted_crashed_job_dirs
 
 class VASPdata(object):
-    """Class used to collect VASP job analysis and postprocessing data (e.g. Fermi level, band center, etc.) and write
-    it to json file for each job directory. Also contains a utility to write all desired metadata to spreadsheet
+    """Class used to write all calculated VASP (analyzed and post-processing) data to spreadsheet
     args:
-        vaspdatafile : (json) A file containing VASP job analysis and postprocessing data
+        vaspdatafile : (str) Name of a JSON file containing VASP job analysis and postprocessing data. Keep default
+            value if using other analysi and/or postprocessing routines in this code package, as they automatically
+            output values to this default file name.
     instance methods:
         write_vaspdata_to_spreadsheet: (None) Loops through directories and collects all data in vaspdatafile, or from
             the list of files specified by the user
