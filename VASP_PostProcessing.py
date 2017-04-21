@@ -376,7 +376,8 @@ class DoscarAnalyzer(object):
         pyplot.ylabel('Total Densities of States (states/eV-atom)')
         pyplot.title('Total Density of States')
         pyplot.legend()
-        pyplot.ylim(-1*max(total_dos), max(total_dos))
+        #pyplot.ylim([-1*max(total_dos_down_list), max(total_dos_up_list)])
+        pyplot.ylim([-5, 5])
         pyplot.xlim([-10, 10])
         pyplot.savefig('TotalDOS.pdf')
         return None
