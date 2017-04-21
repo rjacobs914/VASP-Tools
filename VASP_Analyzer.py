@@ -876,13 +876,12 @@ class VASPdata(object):
                 dataframe_dict = {}
                 vaspdatafile = open(self.vaspdatafile, "r")
                 vaspdata = json.load(vaspdatafile)
-                for entry in vaspdata:
-                    for key, value in vaspdata[entry].items():
-                        if type(value) is dict:
-                            for key2, value2 in value.items():
-                                dataframe_dict[key2] = value2
-                        else:
-                            dataframe_dict[key] = value
+                for key, value in vaspdata.items():
+                    if type(value) is dict:
+                        for key2, value2 in value.items():
+                            dataframe_dict[key2] = value2
+                    else:
+                        dataframe_dict[key] = value
                 dataframe_dict["Directory"] = directory
                 dataframe_data.append(dataframe_dict)
             dataframe = pd.DataFrame(dataframe_data)
@@ -891,6 +890,29 @@ class VASPdata(object):
         writer = pd.ExcelWriter(cwd + "/" + 'vaspdata_collected.xlsx')
         dataframe.to_excel(excel_writer=writer, sheet_name='collected vaspdata', index=False)
         writer.save()
+        return None
+
+    def _output_to_vaspdata_file(self, value_names, values):
+        cwd = os.getcwd()
+        data_dict = {}
+        if os.path.exists(cwd+"/"+str(self.vaspdatafile)):
+            vaspdata = open(self.vaspdatafile, "r")
+            vaspdata_readin = json.load(vaspdata)
+            for key, value in vaspdata_readin.items():
+                data_dict[key] = value
+            vaspdata.close()
+        else:
+            self._create_vaspdata_file()
+
+        if type(value_names) is list and type(values) is list:
+            for entry1, entry2 in zip(value_names, values):
+                data_dict[entry1] = entry2
+        else:
+            data_dict[value_names] = values
+
+        vaspdata = open(self.vaspdatafile, "w")
+        json.dump(data_dict, vaspdata)
+        vaspdata.close()
         return None
 
     def _create_vaspdata_file(self):
