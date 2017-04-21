@@ -828,7 +828,7 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
                     continue
         return resubmitted_crashed_job_dirs
 
-class VASPMetadata(object):
+class VASPdata(object):
     """Class used to collect VASP job analysis and postprocessing data (e.g. Fermi level, band center, etc.) and write
     it to json file for each job directory. Also contains a utility to write all desired metadata to spreadsheet
     args:
@@ -836,10 +836,10 @@ class VASPMetadata(object):
     instance methods:
         xxx: xxx
     """
-    def __init__(self, metadatafile = "metadata.json"):
-        self.metadatafile = metadatafile
+    def __init__(self, vaspdatafile = "vaspdata.json"):
+        self.vaspdatafile = vaspdatafile
 
-    def write_metadata_to_spreadsheet(self, directory_list, use_custom_file_list=False, custom_file_list=None):
+    def write_vaspdata_to_spreadsheet(self, directory_list, use_custom_file_list=False, custom_file_list=None):
         cwd = os.getcwd()
         dataframe_data = []
 
@@ -865,8 +865,8 @@ class VASPMetadata(object):
             dataframe = dataframe.rename(columns={len(custom_file_list)+1 : "Directory"})
 
             # Write pandas dataframe to excel file
-            writer = pd.ExcelWriter(cwd+"/"+'metadata_collected.xlsx')
-            dataframe.to_excel(excel_writer=writer, sheet_name='collected metadata', index=False)
+            writer = pd.ExcelWriter(cwd+"/"+'vaspdata_collected.xlsx')
+            dataframe.to_excel(excel_writer=writer, sheet_name='collected vaspdata', index=False)
             writer.save()
 
         elif use_custom_file_list == bool(False):
@@ -884,22 +884,22 @@ class VASPMetadata(object):
 
         return None
 
-    def collect_basic_metadata(self):
+    def collect_basic_vaspdata(self):
         # Currently just testing this functionality
         directory = os.getcwd()
         pa = PoscarAnalyzer()
         elements = pa.get_element_names()
-        if os.path.exists(directory+"/"+str(self.metadatafile)):
-            metadata = open(self.metadatafile, "w")
-            json.dump({directory: {"Elements": elements} }, metadata)
-            metadata.close()
+        if os.path.exists(directory+"/"+str(self.vaspdatafile)):
+            vaspdata = open(self.vaspdatafile, "w")
+            json.dump({directory: {"Elements": elements} }, vaspdata)
+            vaspdata.close()
         return None
 
-    def _create_metadata_file(self):
+    def _create_vaspdata_file(self):
         cwd = os.getcwd()
-        if not os.path.exists(cwd+"/"+str(self.metadatafile)):
-            metadata = open(str(self.metadatafile), "w")
-            metadata.close()
+        if not os.path.exists(cwd+"/"+str(self.vaspdatafile)):
+            vaspdata = open(str(self.vaspdatafile), "w")
+            vaspdata.close()
         else:
             pass
         return None
