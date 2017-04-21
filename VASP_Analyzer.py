@@ -18,6 +18,8 @@ import getpass
 import subprocess
 import logging
 import shutil
+import xlsxwriter
+import pandas as pd
 
 class PoscarAnalyzer(object):
     """Class used to obtain basic, useful quantities from the POSCAR file.
@@ -63,12 +65,17 @@ class PoscarAnalyzer(object):
             total_atoms += float(atom_amounts[index])
         return total_atoms
 
-    def get_composition_dict(self):
+    def get_composition_dict(self, write_to_file=False):
         composition_dict = {}
         atom_amounts = self.get_atom_amounts()
         element_names = self.get_element_names()
         for element, atom in zip(element_names, atom_amounts):
             composition_dict[element] = atom
+        if write_to_file == bool(True):
+            f = open("composition.txt", "w")
+            for key, value in composition_dict.items():
+                f.write(str(key)+str(value))
+            f.close()
         return composition_dict
 
     def get_element_composition(self):
@@ -832,6 +839,51 @@ class VASPMetadata(object):
     def __init__(self, metadatafile = "metadata.json"):
         self.metadatafile = metadatafile
 
+    def write_metadata_to_spreadsheet(self, directory_list, use_custom_file_list=False, custom_file_list=None):
+        cwd = os.getcwd()
+        dataframe_data = []
+
+        if use_custom_file_list == bool(True):
+            for directory in directory_list:
+                os.chdir(directory)
+                filecount = 0
+                datadict = {}
+                for f in custom_file_list:
+                    try:
+                        file_data = open(f, "r").readlines()
+                        datadict[filecount] = file_data[0]
+                    except IOError:
+                        print "File of type %s was not found" % str(f)
+                    filecount += 1
+                dataframe_data.append(datadict)
+                datadict[len(custom_file_list)+1] = directory
+
+            # Write all data to pandas dataframe, and rename dataframe columns
+            dataframe = pd.DataFrame(dataframe_data)
+            for index, entry in enumerate(custom_file_list):
+                dataframe = dataframe.rename(columns={index : entry[:-4]})
+            dataframe = dataframe.rename(columns={len(custom_file_list)+1 : "Directory"})
+
+            # Write pandas dataframe to excel file
+            writer = pd.ExcelWriter(cwd+"/"+'metadata_collected.xlsx')
+            dataframe.to_excel(excel_writer=writer, sheet_name='collected metadata', index=False)
+            writer.save()
+
+        elif use_custom_file_list == bool(False):
+            """
+            file_data = json.load(self.metadatafile)
+
+            row = 0
+            key_count = 0
+            for key in file_data.keys():
+                excel_sheet.write(int(row), int(key_count), key, bold)
+                key_count += 1
+
+            row = 1
+            """
+
+        return None
+
     def collect_basic_metadata(self):
         # Currently just testing this functionality
         directory = os.getcwd()
@@ -852,17 +904,4 @@ class VASPMetadata(object):
             pass
         return None
 
-    """
-    def _write_metadata_to_spreadsheet(self, directory_list):
-        cwd = os.getcwd()
-        excel_file = xlsxwriter.Workbook('metadata_collected.xlsx')
-        excel_sheet = excel_file.add_worksheet('collected metadata')
-        bold = excel_file.add_format({'bold': True})
-        column_name_dict = {"0":"Directory", "1":"Material Composition", "2":"Number of atoms", "3":"Energy (eV/cell)",
-                            "4":"Stability (meV/atom)", "5":"Fermi energy (eV)", "6":"Band gap (eV)"}
-        row = 0
-        for key, value in column_name_dict.iteritems():
-            excel_sheet.write(int(row), int(key), value, bold)
-        excel_file.close()
-        return None
-    """
+
