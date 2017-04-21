@@ -501,23 +501,23 @@ class DoscarAnalyzer(object):
         pa = PoscarAnalyzer(self.poscar)
         element_names = pa.get_element_names()
         atom_amounts = pa.get_atom_amounts()
-        dos_s_list_E = []
-        dos_s_list_total_occ = []
-        dos_p_list_E = []
-        dos_p_list_total_occ = []
-        dos_d_list_E = []
-        dos_d_list_total_occ = []
-        dos_s_list_total = []
-        dos_s_list_E_occ = []
-        dos_p_list_total = []
-        dos_p_list_E_occ = []
-        dos_d_list_total = []
-        dos_d_list_E_occ = []
 
         band_center_list = []
         band_center_occ_list = []
 
         for element_number in range(len(atom_amounts)):
+            dos_s_list_E = []
+            dos_s_list_total_occ = []
+            dos_p_list_E = []
+            dos_p_list_total_occ = []
+            dos_d_list_E = []
+            dos_d_list_total_occ = []
+            dos_s_list_total = []
+            dos_s_list_E_occ = []
+            dos_p_list_total = []
+            dos_p_list_E_occ = []
+            dos_d_list_total = []
+            dos_d_list_E_occ = []
             for index in range(nedos):
                 dos_s_list_total.append(
                     dos_s_list[index + nedos * element_number][0] + dos_s_list[index + nedos * element_number][1])
@@ -568,12 +568,12 @@ class DoscarAnalyzer(object):
                     filename = "%s_bandcenters.txt" % element
                     file = open(filename, "w")
                     for key, value in band_center_dict.items():
-                        file.write(str(key)+"="+str(value))
+                        file.write(str(key)+"="+str(value)+"\n")
                     file.close()
                     filename = "%s_bandcenters_occ.txt" % element
                     file = open(filename, "w")
                     for key, value in band_center_dict_occ.items():
-                        file.write(str(key)+"="+str(value))
+                        file.write(str(key)+"="+str(value)+"\n")
                     file.close()
 
                 band_center_list.append(band_center_dict)
