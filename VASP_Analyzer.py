@@ -18,8 +18,8 @@ import getpass
 import subprocess
 import logging
 import shutil
-import xlsxwriter
 import pandas as pd
+from pprint import pprint
 
 class PoscarAnalyzer(object):
     """Class used to obtain basic, useful quantities from the POSCAR file.
@@ -832,9 +832,15 @@ class VASPdata(object):
     """Class used to collect VASP job analysis and postprocessing data (e.g. Fermi level, band center, etc.) and write
     it to json file for each job directory. Also contains a utility to write all desired metadata to spreadsheet
     args:
-        metadatafile : (json) A file containing VASP job analysis and postprocessing metadata
+        vaspdatafile : (json) A file containing VASP job analysis and postprocessing data
     instance methods:
-        xxx: xxx
+        write_vaspdata_to_spreadsheet: (None) Loops through directories and collects all data in vaspdatafile, or from
+            the list of files specified by the user
+            args:
+                directory_list : (list) A list of directories to loop over
+                use_custom_file_list : (bool) whether to collect data from manually specified file names
+                custom_file_list : (list) if use_custom_file_list = True, then provide a list of the filenames to get
+                    data from.
     """
     def __init__(self, vaspdatafile = "vaspdata.json"):
         self.vaspdatafile = vaspdatafile
@@ -864,35 +870,21 @@ class VASPdata(object):
                 dataframe = dataframe.rename(columns={index : entry[:-4]})
             dataframe = dataframe.rename(columns={len(custom_file_list)+1 : "Directory"})
 
-            # Write pandas dataframe to excel file
-            writer = pd.ExcelWriter(cwd+"/"+'vaspdata_collected.xlsx')
-            dataframe.to_excel(excel_writer=writer, sheet_name='collected vaspdata', index=False)
-            writer.save()
+        if use_custom_file_list == bool(False):
+            for directory in directory_list:
+                os.chdir(directory)
+                vaspdatafile = open(self.vaspdatafile, "r")
+                dataframe_dict = json.load(vaspdatafile)
+                pprint(dataframe_dict)
+                for entry in dataframe_dict:
+                    dataframe_data.append(entry)
+            dataframe = pd.DataFrame(dataframe_data)
+            dataframe.transpose()
 
-        elif use_custom_file_list == bool(False):
-            """
-            file_data = json.load(self.metadatafile)
-
-            row = 0
-            key_count = 0
-            for key in file_data.keys():
-                excel_sheet.write(int(row), int(key_count), key, bold)
-                key_count += 1
-
-            row = 1
-            """
-
-        return None
-
-    def collect_basic_vaspdata(self):
-        # Currently just testing this functionality
-        directory = os.getcwd()
-        pa = PoscarAnalyzer()
-        elements = pa.get_element_names()
-        if os.path.exists(directory+"/"+str(self.vaspdatafile)):
-            vaspdata = open(self.vaspdatafile, "w")
-            json.dump({directory: {"Elements": elements} }, vaspdata)
-            vaspdata.close()
+        # Write pandas dataframe to excel file
+        writer = pd.ExcelWriter(cwd + "/" + 'vaspdata_collected.xlsx')
+        dataframe.to_excel(excel_writer=writer, sheet_name='collected vaspdata', index=False)
+        writer.save()
         return None
 
     def _create_vaspdata_file(self):
