@@ -357,7 +357,7 @@ class DoscarAnalyzer(object):
         total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
         energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
         dosdata, total_dos = self._cleanup_projected_dos()
-        number_of_atoms = PoscarAnalyzer(poscar=self.poscar).get_total_atoms
+        number_of_atoms = PoscarAnalyzer(poscar=self.poscar).get_total_atoms()
 
         total_dos_down_list_neg = []
         for index in range(len(total_dos_down_list)):
