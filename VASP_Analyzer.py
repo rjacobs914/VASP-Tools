@@ -873,13 +873,19 @@ class VASPdata(object):
         if use_custom_file_list == bool(False):
             for directory in directory_list:
                 os.chdir(directory)
+                dataframe_dict = {}
                 vaspdatafile = open(self.vaspdatafile, "r")
-                dataframe_dict = json.load(vaspdatafile)
-                pprint(dataframe_dict)
-                for entry in dataframe_dict:
-                    dataframe_data.append(entry)
+                vaspdata = json.load(vaspdatafile)
+                for entry in vaspdata:
+                    for key, value in vaspdata[entry].items():
+                        if type(value) is dict:
+                            for key2, value2 in value.items():
+                                dataframe_dict[key2] = value2
+                        else:
+                            dataframe_dict[key] = value
+                dataframe_dict["Directory"] = directory
+                dataframe_data.append(dataframe_dict)
             dataframe = pd.DataFrame(dataframe_data)
-            dataframe.transpose()
 
         # Write pandas dataframe to excel file
         writer = pd.ExcelWriter(cwd + "/" + 'vaspdata_collected.xlsx')
