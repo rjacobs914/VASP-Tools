@@ -289,7 +289,7 @@ class OutcarAnalyzer(object):
                     max_magnetization_index = index
         for index, entry in enumerate(mag_data_raw):
             if index >= max_magnetization_index+4 and index < max_magnetization_index+total_atoms+4:
-                mag_data_dict[int(entry.split()[0])] = float(entry.split()[5])
+                mag_data_dict[int(entry.split()[0])] = float(entry.split()[-1])
         return mag_data_dict
 
     def get_magnetization_for_element_type(self, element, write_to_file=False):
@@ -322,7 +322,7 @@ class OutcarAnalyzer(object):
         if write_to_file == bool(True):
             filestr = element+"_element_magnetization.txt"
             file = open(filestr, "w")
-            file.write(element_mag)
+            file.write(str(element_mag))
             file.close()
 
         return element_mag
@@ -887,14 +887,15 @@ class VASPdata(object):
         if use_custom_file_list == bool(True):
             for directory in directory_list:
                 os.chdir(directory)
+                print directory
                 filecount = 0
                 datadict = {}
                 for f in custom_file_list:
                     try:
                         file_data = open(f, "r").readlines()
                         datadict[filecount] = file_data[0]
-                    except IOError:
-                        print "File of type %s was not found" % str(f)
+                    except (IOError, IndexError):
+                        print "File of type %s was not found, or there was a problem reading the file" % str(f)
                     filecount += 1
                 dataframe_data.append(datadict)
                 datadict[len(custom_file_list)+1] = directory
