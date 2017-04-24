@@ -94,7 +94,7 @@ class PotcarFileSetup(object):
             raise ValueError('psp_path must equal either "PBE" or "PW91"')
 
         if os.path.exists(os.getcwd()+"/"+"POSCAR"):
-            element_names = PoscarAnalyzer(self.poscar).get_element_names
+            element_names = PoscarAnalyzer(self.poscar).get_element_names()
         else:
             raise IOError('No POSCAR file exists in the working directory')
 
