@@ -36,7 +36,6 @@ class PoscarAnalyzer(object):
         get_cell_volume : (float) returns total volume of supercell
         get_atom_positions_direct : (numpy array) returns positions of all atoms in supercell, in direct coordinates
         get_atom_positions_cartesian : (numpy array) returns positions of all atoms in supercell, in units of Angstroms
-        get_atom_distances : (???) returns array containing distances of all atoms from all others
     """
     def __init__(self, poscar="POSCAR"):
         self.poscar = poscar
