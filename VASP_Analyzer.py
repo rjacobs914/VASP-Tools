@@ -292,7 +292,7 @@ class OutcarAnalyzer(object):
                 mag_data_dict[int(entry.split()[0])] = float(entry.split()[5])
         return mag_data_dict
 
-    def get_magnetization_for_element_type(self, element):
+    def get_magnetization_for_element_type(self, element, write_to_file=False):
         mag_data_dict = self.get_magnetization_per_atom()
         pa = PoscarAnalyzer()
         element_names = pa.get_element_names()
@@ -318,6 +318,12 @@ class OutcarAnalyzer(object):
             if key == element:
                 number_of_atoms_for_element = value
         element_mag = element_mag/number_of_atoms_for_element
+
+        if write_to_file == bool(True):
+            filestr = '%s'+"_element_magnetization.txt" % element
+            file = open(filestr, "w")
+            file.write(element_mag)
+            file.close()
 
         return element_mag
 
