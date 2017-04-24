@@ -887,7 +887,6 @@ class VASPdata(object):
         if use_custom_file_list == bool(True):
             for directory in directory_list:
                 os.chdir(directory)
-                print directory
                 filecount = 0
                 datadict = {}
                 for f in custom_file_list:
