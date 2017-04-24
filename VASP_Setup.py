@@ -181,7 +181,7 @@ class IncarFileSetup():
     def write_predefined_incar_file(self, simulation_type, xc_functional, number_of_nodes, disable_symmetry, poscar="POSCAR",
                                     material_type="insulator", write_chgcar=False, write_wavecar=False):
         if os.path.exists(os.getcwd()+"/"+poscar):
-            element_names = PoscarAnalyzer(poscar).get_element_names
+            element_names = PoscarAnalyzer(poscar).get_element_names()
         else:
             raise IOError('No POSCAR file exists in the working directory')
 
@@ -242,7 +242,7 @@ class IncarFileSetup():
                     ldauj_list.append("0")
                     ldaul_list.append("-1")
                     ldauu_list.append("0")
-            ldauj_str = ''; ldauu_str = ''; ldaul_str = '';
+            ldauj_str = ''; ldauu_str = ''; ldaul_str = ''
             for index in range(len(ldauj_list)):
                 ldauj_str += str(index)+" "
             for index in range(len(ldaul_list)):
@@ -444,7 +444,7 @@ class PoscarFileSetup(object):
         material_ids = []
         mprester = MPRester(self.mapi_key)
         structure_data_list = self._get_data_from_materials_project()
-        structure_list = []; structure_conventional_list = [];
+        structure_list = []; structure_conventional_list = []
         for structure_dict in structure_data_list:
             structure = mprester.get_structure_by_material_id(material_id=str(structure_dict["material_id"]))
             structure_list.append(structure)

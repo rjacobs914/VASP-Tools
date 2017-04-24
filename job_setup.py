@@ -120,6 +120,12 @@ queue_name = "morgan"
 # Gamma and you're using 1 kpoint (can get about 2x speed increase)
 use_gamma_point_executable = False
 
+#############
+# Specify whether to submit your new jobs
+#############
+
+submit_new_jobs = False
+
 ########################################################################################################################
 ########################################################################################################################
 import os
@@ -142,6 +148,8 @@ def main():
             print "Copying existing POSCAR to %s" % new_dir
             shutil.copy(dir_entry+"/"+"POSCAR", new_dir)
 
+        os.chdir(new_dir)
+
         if use_existing_poscar == bool(False):
             psr_setup = PoscarFileSetup(material_composition=material, mapi_key=mapi_key)
             psr_setup.write_poscar_file()
@@ -157,6 +165,9 @@ def main():
                                        number_of_nodes=number_of_nodes, disable_symmetry=disable_symmetry, poscar="POSCAR", material_type=electronic_structure_type,
                                        write_chgcar=write_chgcar_file, write_wavecar=write_wavecar_file)
         sub_setup.write_submit_file()
+
+        if submit_new_jobs == bool(True):
+            JobSubmission().submit_job(directory=new_dir, submit_file='submit.sh', queue_command='sbatch')
 
 if __name__=="__main__":
     main()
