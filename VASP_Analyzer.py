@@ -293,6 +293,35 @@ class OutcarAnalyzer(object):
                 mag_data_dict[int(entry.split()[0])] = float(entry.split()[5])
         return mag_data_dict
 
+    def get_magnetization_for_element_type(self, element):
+        mag_data_dict = self.get_magnetization_per_atom()
+        pa = PoscarAnalyzer()
+        element_names = pa.get_element_names()
+        atom_amounts = pa.get_atom_amounts()
+        composition = pa.get_composition_dict(write_to_file=False)
+        element_label_dict = {}
+
+        # Make dict of atom numbers and assign appropriate element to them
+        atom_count = 0
+        element_mag = 0
+        for entry1, entry2 in zip(element_names, atom_amounts):
+            for index in range(entry2):
+                atom_count += 1
+                element_label_dict[atom_count] = entry1
+
+        # Go through mag_data_dict and add magnetization of element type arg
+        for value1, value2 in zip(element_label_dict.values(), mag_data_dict.values()):
+            if value1 == element:
+                element_mag += float(value2)
+
+        # Normalize element_mag by the number of atoms of that type
+        for key, value in composition.items():
+            if key == element:
+                number_of_atoms_for_element = value
+        element_mag = element_mag/number_of_atoms_for_element
+
+        return element_mag
+
 class OszicarAnalyzer(object):
     """Class used to obtain basic, useful quantities from the OSZICAR file.
     args:
