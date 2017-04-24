@@ -147,10 +147,11 @@ def main():
         if use_existing_poscar == bool(True):
             # Copy existing CONTCAR to new directory and make it POSCAR
             if os.path.exists(dir_entry+"/"+"CONTCAR"):
-                print "Copying existing CONTCAR to %s" % new_dir
-                shutil.copy(dir_entry+"/"+"CONTCAR", new_dir)
-                os.chdir(new_dir)
-                shutil.move(new_dir+"/"+"CONTCAR", new_dir+"/"+"POSCAR")
+                if os.path.getsize(dir_entry+"/"+"CONTCAR") > 0:
+                    print "Copying existing CONTCAR to %s" % new_dir
+                    shutil.copy(dir_entry+"/"+"CONTCAR", new_dir)
+                    os.chdir(new_dir)
+                    shutil.move(new_dir+"/"+"CONTCAR", new_dir+"/"+"POSCAR")
             else:
                 print "Copying existing POSCAR to %s" % new_dir
                 shutil.copy(dir_entry + "/" + "POSCAR", new_dir)
