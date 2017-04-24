@@ -152,9 +152,13 @@ def main():
                     shutil.copy(dir_entry+"/"+"CONTCAR", new_dir)
                     os.chdir(new_dir)
                     shutil.move(new_dir+"/"+"CONTCAR", new_dir+"/"+"POSCAR")
+                else:
+                    print "No CONTCAR available. Copying existing POSCAR to %s" % new_dir
+                    shutil.copy(dir_entry+"/"+"POSCAR", new_dir)
+                    os.chdir(new_dir)
             else:
                 print "Copying existing POSCAR to %s" % new_dir
-                shutil.copy(dir_entry + "/" + "POSCAR", new_dir)
+                shutil.copy(dir_entry+"/"+"POSCAR", new_dir)
                 os.chdir(new_dir)
 
         if use_existing_poscar == bool(False):
