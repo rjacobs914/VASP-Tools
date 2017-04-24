@@ -320,7 +320,7 @@ class OutcarAnalyzer(object):
         element_mag = element_mag/number_of_atoms_for_element
 
         if write_to_file == bool(True):
-            filestr = '%s'+"_element_magnetization.txt" % element
+            filestr = element+"_element_magnetization.txt"
             file = open(filestr, "w")
             file.write(element_mag)
             file.close()
