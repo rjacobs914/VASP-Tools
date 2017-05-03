@@ -178,16 +178,20 @@ class IncarFileSetup():
     def __init__(self):
         pass
 
-    def write_predefined_incar_file(self, simulation_type, xc_functional, number_of_nodes, disable_symmetry, poscar="POSCAR",
-                                    material_type="insulator", write_chgcar=False, write_wavecar=False):
+    def write_predefined_incar_file(self, simulation_type, xc_functional, number_of_nodes, cores_per_node,
+                                    disable_symmetry, poscar="POSCAR", material_type="insulator", write_chgcar=False,
+                                    write_wavecar=False):
         if os.path.exists(os.getcwd()+"/"+poscar):
             element_names = PoscarAnalyzer(poscar).get_element_names()
         else:
             raise IOError('No POSCAR file exists in the working directory')
 
         incar_dict = {"ENCUT": 500, "IBRION": 2, "ISMEAR": 0, "ISPIN": 2, "LORBIT": 11, "NEDOS": 2000, "PREC": "Accurate",
-                      "NPAR": number_of_nodes, "NELM": 250, "TIME": 0.05, "ALGO": "All"}
-
+                      "NELM": 250, "TIME": 0.05, "ALGO": "All"}
+        if not simulation_type == 'HSE':
+            incar_dict.update(NPAR=number_of_nodes)
+        if simulation_type == 'HSE':
+            incar_dict.update(NPAR=number_of_nodes*cores_per_node)
         if disable_symmetry == bool(True):
             incar_dict.update(ISYM=0)
 
