@@ -72,7 +72,7 @@ kpoint_mesh_type = "Monkhorst-Pack"
 
 # Specify kpoint mesh. For kpoint_mesh_type = "Gamma" and "Monkhorst-Pack", this is e.g. "4 4 4", For "Auto", 25 is
 # typically a good choice
-kpoint_mesh_value = "4 4 4"
+kpoint_mesh_value = "2 2 2"
 
 #############
 # Variables related to setting up INCAR file
@@ -88,11 +88,14 @@ DFT_run_type = "full_relax"
 # Specify the number of nodes to use in your calculation
 number_of_nodes = 2
 
+# Specify the number of cores used for each node
+cores_per_node = 24
+
 # Specify the type of exchange-correlation functional to use. Choices are:
     # "GGA": Standard GGA
     # "GGA+U": GGA with U values for transition metals consistent with Materials Project usage
     # "HSE": Hybrid GGA with standard 25% Hartree-Fock mixing
-type_of_exchange_correlation_functional = "GGA"
+type_of_exchange_correlation_functional = "HSE"
 
 # Specify the type of electronic structure the material has. Choices are "metal" and "insulator"
 electronic_structure_type = "insulator"
@@ -104,21 +107,21 @@ disable_symmetry = False
 write_chgcar_file = False
 
 # Specify whether or not to write the WAVECAR file (True/False)
-write_wavecar_file = False
+write_wavecar_file = True
 
 #############
 # Variables related to setting up submit file
 #############
 
 # Specify the name of the cluster you're submitting the job to. Choices are "Turnbull", "ACI", "Cori", "Stampede"
-cluster_name = "ACI"
+cluster_name = "Cori"
 
 # Specify the name of the queue you're submitting the job to.
     # "morgan.q" if cluster_name = "Turnbull"
     # "univ", "univ2", "morgan", or "morgan2" if cluster_name = "ACI"
     # "normal" if cluster_name = "Stampede"
     # "regular" if cluster_name = "Cori"
-queue_name = "morgan"
+queue_name = "regular"
 
 # Whether or not to use the gamma-point VASP executable (True/False). Consider setting to True if your kpoint mesh is
 # Gamma and you're using 1 kpoint (can get about 2x speed increase)
@@ -182,7 +185,7 @@ def main():
         ptr_setup.write_potcar_file()
         kpt_setup.write_kpoints_file()
         inc_setup.write_predefined_incar_file(simulation_type=DFT_run_type, xc_functional=type_of_exchange_correlation_functional,
-                                       number_of_nodes=number_of_nodes, disable_symmetry=disable_symmetry, poscar="POSCAR", material_type=electronic_structure_type,
+                                       number_of_nodes=number_of_nodes, cores_per_node=cores_per_node, disable_symmetry=disable_symmetry, poscar="POSCAR", material_type=electronic_structure_type,
                                        write_chgcar=write_chgcar_file, write_wavecar=write_wavecar_file)
         sub_setup.write_submit_file()
 
