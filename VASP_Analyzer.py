@@ -892,7 +892,7 @@ class VASPdata(object):
                 for f in custom_file_list:
                     try:
                         file_data = open(f, "r").readlines()
-                        datadict[filecount] = file_data[0]
+                        datadict[filecount] = file_data[0].strip()
                     except (IOError, IndexError):
                         print "File of type %s was not found, or there was a problem reading the file" % str(f)
                     filecount += 1

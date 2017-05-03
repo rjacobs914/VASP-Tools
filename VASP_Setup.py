@@ -244,11 +244,11 @@ class IncarFileSetup():
                     ldauu_list.append("0")
             ldauj_str = ''; ldauu_str = ''; ldaul_str = ''
             for index in range(len(ldauj_list)):
-                ldauj_str += str(index)+" "
+                ldauj_str += str(ldauj_list[index])+" "
             for index in range(len(ldaul_list)):
-                ldaul_str += str(index)+" "
+                ldaul_str += str(ldaul_list[index])+" "
             for index in range(len(ldauu_list)):
-                ldauu_str += str(index)+" "
+                ldauu_str += str(ldauu_list[index])+" "
             incar_dict.update(LDAUJ=ldauj_str)
             incar_dict.update(LDAUU=ldauu_str)
             incar_dict.update(LDAUL=ldaul_str)
