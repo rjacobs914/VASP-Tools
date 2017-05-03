@@ -188,9 +188,9 @@ class IncarFileSetup():
 
         incar_dict = {"ENCUT": 500, "IBRION": 2, "ISMEAR": 0, "ISPIN": 2, "LORBIT": 11, "NEDOS": 2000, "PREC": "Accurate",
                       "NELM": 250, "TIME": 0.05, "ALGO": "All"}
-        if not simulation_type == 'HSE':
+        if not xc_functional == 'HSE':
             incar_dict.update(NPAR=number_of_nodes)
-        if simulation_type == 'HSE':
+        if xc_functional == 'HSE':
             incar_dict.update(NPAR=number_of_nodes*cores_per_node)
         if disable_symmetry == bool(True):
             incar_dict.update(ISYM=0)
