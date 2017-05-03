@@ -44,6 +44,10 @@ at your terminal:
 # Required entries are below, with examples provided
 ####################################################
 
+# Specify whether you'd like to try copying an old CONTCAR file to a new directory to make your runs (True), or simply
+# create files in the existing directory containing a POSCAR file (false)
+copy_contcar_and_make_new_directory = False
+
 # Specify whether you'd like to use an existing POSCAR to generate a surface or import the structure from Materials Project
 use_existing_poscar = True
 
@@ -120,6 +124,10 @@ queue_name = "morgan"
 # Gamma and you're using 1 kpoint (can get about 2x speed increase)
 use_gamma_point_executable = False
 
+# Specify name of queue partition, if available (defaults to None)
+# If using Cori, queue_partition must equal "haswell" or "knl"
+queue_partition = "haswell"
+
 #############
 # Specify whether to submit your new jobs
 #############
@@ -139,12 +147,13 @@ def main():
     for dir_entry in dir_list:
         print "Entering directory", dir_entry
         os.chdir(dir_entry)
-        new_dir = dir_entry + "/" + "new_run"
 
-        if not os.path.exists(new_dir):
-            os.mkdir(new_dir)
+        if copy_contcar_and_make_new_directory == bool(True):
+            new_dir = dir_entry + "/" + "new_run"
 
-        if use_existing_poscar == bool(True):
+            if not os.path.exists(new_dir):
+                os.mkdir(new_dir)
+
             # Copy existing CONTCAR to new directory and make it POSCAR
             if os.path.exists(dir_entry+"/"+"CONTCAR"):
                 if os.path.getsize(dir_entry+"/"+"CONTCAR") > 0:
@@ -169,7 +178,7 @@ def main():
         kpt_setup = KpointsFileSetup(mesh_type=kpoint_mesh_type, mesh_value=kpoint_mesh_value)
         inc_setup = IncarFileSetup()
         sub_setup = SubmitFileSetup(cluster=cluster_name, queue=queue_name, number_of_nodes=number_of_nodes,
-                                        gamma_point=use_gamma_point_executable)
+                                        gamma_point=use_gamma_point_executable, queue_partition=queue_partition)
         ptr_setup.write_potcar_file()
         kpt_setup.write_kpoints_file()
         inc_setup.write_predefined_incar_file(simulation_type=DFT_run_type, xc_functional=type_of_exchange_correlation_functional,
