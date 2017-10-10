@@ -19,7 +19,6 @@ import subprocess
 import logging
 import shutil
 import pandas as pd
-from pprint import pprint
 
 class PoscarAnalyzer(object):
     """Class used to obtain basic, useful quantities from the POSCAR file.
@@ -503,9 +502,15 @@ class JobAnalyzer(object):
     def __init__(self):
         pass
 
-    def _get_running_and_queued_jobs(self):
+    def _prune_directory_list(self, orig_directory_list, directory_list_to_remove):
+        pruned_directory_list = list()
+        for directory in orig_directory_list:
+            if directory not in directory_list_to_remove:
+                pruned_directory_list.append(directory)
+        return pruned_directory_list
+
+    def _get_running_and_queued_jobs(self, directory_list):
         parent_directory = os.getcwd()
-        #directory_list = DirectoryUtilities.get_downmost_directory_list()
         running_jobs = []
         queued_jobs = []
 
@@ -547,36 +552,13 @@ class JobAnalyzer(object):
                 else:
                     directory_with_job_running = os.path.dirname(path_with_job_running.stdout.readline())
                     queued_jobs.append(directory_with_job_running)
-        """
-        # Differentiate between running jobs and queued jobs based on if file containing jobid is written in dir
-        running_job_dirs = []
-        queued_job_dirs = []
 
-        if len(job_numbers) > 0:
-            for directory in running_and_queued_job_dirs:
-                for job_number in job_numbers:
-                    if job_number in os.listdir(directory):
-                        # Job is running
-                        running_job_dirs.append(directory)
-                    else:
-                        # Job is still queued
-                        queued_job_dirs.append(directory)
-
-        running_job_dirs_inpath = []
-        queued_job_dirs_inpath = []
-        for dir1, dir2 in zip(running_job_dirs, queued_job_dirs):
-            if dir1 in directory_list:
-                running_job_dirs_inpath.append(dir1)
-            if dir2 in directory_list:
-                queued_job_dirs_inpath.append(dir2)
-        """
-
-        #return running_job_dirs_inpath, queued_job_dirs_inpath
-        return running_jobs, queued_jobs
+        pruned_directory_list1 = self._prune_directory_list(orig_directory_list=directory_list, directory_list_to_remove=running_jobs)
+        pruned_directory_list = self._prune_directory_list(orig_directory_list=pruned_directory_list1, directory_list_to_remove=queued_jobs)
+        return running_jobs, queued_jobs, pruned_directory_list
 
     def _get_complete_and_incomplete_jobs(self, directory_list, dE_tolerance=float(10**-2)):
         completed_job_dirs = []; incomplete_job_dirs = []
-        #directory_list = DirectoryUtilities.get_downmost_directory_list()
 
         for directory in directory_list:
             os.chdir(directory)
@@ -619,7 +601,9 @@ class JobAnalyzer(object):
                     continue
                 oszicar.close()
 
-        return completed_job_dirs, incomplete_job_dirs
+        pruned_directory_list1 = self._prune_directory_list(orig_directory_list=directory_list, directory_list_to_remove=completed_job_dirs)
+        pruned_directory_list = self._prune_directory_list(orig_directory_list=pruned_directory_list1, directory_list_to_remove=incomplete_job_dirs)
+        return completed_job_dirs, incomplete_job_dirs, pruned_directory_list
 
     def _get_crashed_jobs(self, directory_list):
         crashed_job_dirs = []
@@ -894,7 +878,8 @@ class VASPdata(object):
                         file_data = open(f, "r").readlines()
                         datadict[filecount] = file_data[0].strip()
                     except (IOError, IndexError):
-                        print "File of type %s was not found, or there was a problem reading the file" % str(f)
+                        continue
+                        #print "File of type %s was not found, or there was a problem reading the file" % str(f)
                     filecount += 1
                 dataframe_data.append(datadict)
                 datadict[len(custom_file_list)+1] = directory

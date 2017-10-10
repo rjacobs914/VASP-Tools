@@ -24,8 +24,8 @@ def main(resubmit_incomplete_jobs=False, submit_queued_jobs=False, resubmit_cras
     # Parse the full directory list and only include directories containing VASP input files
     parsed_directory_list = jobmonitor._parse_directory_list(directory_list_to_parse=directory_list)
 
-    running_job_dirs, queued_job_dirs = jobmonitor._get_running_and_queued_jobs()
-    completed_job_dirs, incomplete_job_dirs = jobmonitor._get_complete_and_incomplete_jobs(directory_list=parsed_directory_list)
+    running_job_dirs, queued_job_dirs, pruned_directory_list = jobmonitor._get_running_and_queued_jobs(directory_list=parsed_directory_list)
+    completed_job_dirs, incomplete_job_dirs, pruned_directory_list2 = jobmonitor._get_complete_and_incomplete_jobs(directory_list=pruned_directory_list)
     crashed_job_dirs = jobmonitor._get_crashed_jobs(directory_list=parsed_directory_list)
     nonstarted_job_dirs, old_job_dirs, current_job_dirs = jobmonitor._get_nonstarted_and_old_jobs(directory_list=parsed_directory_list)
 
