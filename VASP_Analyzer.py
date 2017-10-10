@@ -19,6 +19,7 @@ import subprocess
 import logging
 import shutil
 import pandas as pd
+from pprint import pprint
 
 class PoscarAnalyzer(object):
     """Class used to obtain basic, useful quantities from the POSCAR file.
@@ -106,9 +107,9 @@ class PoscarAnalyzer(object):
 
     def get_cell_volume(self):
         lattice_parameters = self.get_lattice_parameters()
-        lattice_parameters_x = lattice_parameters[0][0]
-        lattice_parameters_y = lattice_parameters[1][1]
-        lattice_parameters_z = lattice_parameters[2][2]
+        lattice_parameters_x = np.sqrt((lattice_parameters[0][0])**2+(lattice_parameters[0][1])**2+(lattice_parameters[0][2])**2)
+        lattice_parameters_y = np.sqrt((lattice_parameters[1][0])**2+(lattice_parameters[1][1])**2+(lattice_parameters[1][2])**2)
+        lattice_parameters_z = np.sqrt((lattice_parameters[2][0])**2+(lattice_parameters[2][1])**2+(lattice_parameters[2][2])**2)
         cell_volume = lattice_parameters_x*lattice_parameters_y*lattice_parameters_z
         return cell_volume
 
@@ -864,7 +865,7 @@ class VASPdata(object):
     def __init__(self, vaspdatafile = "vaspdata.json"):
         self.vaspdatafile = vaspdatafile
 
-    def write_vaspdata_to_spreadsheet(self, directory_list, use_custom_file_list=False, custom_file_list=None):
+    def write_vaspdata_to_spreadsheet(self, directory_list, use_custom_file_list=False, custom_file_list=None, file_list_to_string=None, save_to_excel=True):
         cwd = os.getcwd()
         dataframe_data = []
 
@@ -876,10 +877,12 @@ class VASPdata(object):
                 for f in custom_file_list:
                     try:
                         file_data = open(f, "r").readlines()
-                        datadict[filecount] = file_data[0].strip()
+                        if f in file_list_to_string:
+                            datadict[filecount] = file_data[0]
+                        else:
+                            datadict[filecount] = float(file_data[0])
                     except (IOError, IndexError):
-                        continue
-                        #print "File of type %s was not found, or there was a problem reading the file" % str(f)
+                        print "File of type %s was not found, or there was a problem reading the file" % str(f)
                     filecount += 1
                 dataframe_data.append(datadict)
                 datadict[len(custom_file_list)+1] = directory
@@ -907,10 +910,11 @@ class VASPdata(object):
             dataframe = pd.DataFrame(dataframe_data)
 
         # Write pandas dataframe to excel file
-        writer = pd.ExcelWriter(cwd + "/" + 'vaspdata_collected.xlsx')
-        dataframe.to_excel(excel_writer=writer, sheet_name='collected vaspdata', index=False)
-        writer.save()
-        return None
+        if save_to_excel == bool(True):
+            writer = pd.ExcelWriter(cwd + "/" + 'vaspdata_collected.xlsx')
+            dataframe.to_excel(excel_writer=writer, sheet_name='collected vaspdata', index=False)
+            writer.save()
+        return dataframe
 
     def _output_to_vaspdata_file(self, value_names, values):
         cwd = os.getcwd()
