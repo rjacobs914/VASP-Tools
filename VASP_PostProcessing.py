@@ -180,8 +180,8 @@ class LocpotAnalyzer(object):
     def get_empirical_delta_workfunction(self):
         #Obtain the work function difference between the two surfaces using the Helmholtz equation
         #This code assumes the surface is oriented in the c-direction, so that a x b is the surface area
-        dipole = OutcarAnalyzer(self.outcar).get_dipole
-        lattice_parameters = PoscarAnalyzer(self.poscar).get_lattice_parameters
+        dipole = OutcarAnalyzer(self.outcar).get_dipole()
+        lattice_parameters = PoscarAnalyzer(self.poscar).get_lattice_parameters()
         area = lattice_parameters[0][0]*lattice_parameters[1][1]
         delta_workfunction = ((-181)*dipole)/area #units of eV, dipole is in eV-Ang, area, in Ang^2
         return delta_workfunction
@@ -191,7 +191,7 @@ class LocpotAnalyzer(object):
         LOCPOTdata = LOCPOT.readlines()
 
         #Eliminate the header lines of the LOCPOT file
-        total_atoms = int(PoscarAnalyzer(self.poscar).get_total_atoms)
+        total_atoms = int(PoscarAnalyzer(self.poscar).get_total_atoms())
         dataline = LOCPOTdata[total_atoms+9]
         Nx = int(dataline.split()[0])
         Ny = int(dataline.split()[1])
@@ -570,6 +570,10 @@ class DoscarAnalyzer(object):
                     file = open(filename, "w")
                     for key, value in band_center_dict.items():
                         file.write(str(key)+"="+str(value)+"\n")
+                        if key == "O_p":
+                            Opband = open("O_pband_values.txt", "w")
+                            Opband.write(str(value))
+                            Opband.close()
                     file.close()
                     filename = "%s_bandcenters_occ.txt" % element
                     file = open(filename, "w")
@@ -1022,10 +1026,15 @@ class StabilityAnalyzer(object):
         phasediagram = PhaseDiagram(entries=entries_in_system)
         phasediagram_analyzer = PDAnalyzer(phasediagram)
 
-        eabove_file = open("energy_above_hull.txt", "w")
-        eform_file = open("formation_energy.txt", "w")
-        decomp_file = open("decomposition_products.txt", "w")
-        stable_entries_file = open("stable_entries.txt", "w")
+        #eabove_file = open("energy_above_hull.txt", "w")
+        #eform_file = open("formation_energy.txt", "w")
+        #decomp_file = open("decomposition_products.txt", "w")
+        #stable_entries_file = open("stable_entries.txt", "w")
+        eabove_file = open("energy_above_hull_invest.txt", "w")
+        eform_file = open("formation_energy_invest.txt", "w")
+        decomp_file = open("decomposition_products_invest.txt", "w")
+        stable_entries_file = open("stable_entries_invest.txt", "w")
+
 
         for entry in pd_entry_list:
             print "Analyzing entry:", entry
