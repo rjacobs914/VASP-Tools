@@ -16,6 +16,7 @@ import os
 import gzip
 import shutil
 import subprocess
+import numpy as np
 from pymatgen.matproj.rest import MPRester
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.io.vasp.inputs import Poscar
@@ -179,19 +180,15 @@ class IncarFileSetup():
         pass
 
     def write_predefined_incar_file(self, simulation_type, xc_functional, number_of_nodes, cores_per_node,
-                                    disable_symmetry, poscar="POSCAR", material_type="insulator", write_chgcar=False,
-                                    write_wavecar=False):
+                                    disable_symmetry, poscar="POSCAR", material_type="insulator", write_chgcar=False, write_wavecar=False):
         if os.path.exists(os.getcwd()+"/"+poscar):
             element_names = PoscarAnalyzer(poscar).get_element_names()
         else:
             raise IOError('No POSCAR file exists in the working directory')
 
         incar_dict = {"ENCUT": 500, "IBRION": 2, "ISMEAR": 0, "ISPIN": 2, "LORBIT": 11, "NEDOS": 2000, "PREC": "Accurate",
-                      "NELM": 250, "TIME": 0.05, "ALGO": "All"}
-        if not xc_functional == 'HSE':
-            incar_dict.update(NPAR=number_of_nodes)
-        if xc_functional == 'HSE':
-            incar_dict.update(NPAR=number_of_nodes*cores_per_node)
+                      "NELM": 250, "TIME": 0.05, "ALGO": "All", "NPAR": number_of_nodes}
+
         if disable_symmetry == bool(True):
             incar_dict.update(ISYM=0)
 
@@ -256,8 +253,13 @@ class IncarFileSetup():
             incar_dict.update(LDAUJ=ldauj_str)
             incar_dict.update(LDAUU=ldauu_str)
             incar_dict.update(LDAUL=ldaul_str)
+        elif xc_functional == "PBEsol":
+            incar_dict.update(GGA="PS")
+        elif xc_functional == "SCAN":
+            incar_dict.update(METAGGA="RTPSS")
+            incar_dict.update(LASPH="True")
         else:
-            raise ValueError('"xc_functional" must be set to one of "GGA", "GGA-PW91", "HSE", or "GGA+U"')
+            raise ValueError('"xc_functional" must be set to one of "GGA", "GGA-PW91", "HSE", "GGA+U", "PBEsol", or "SCAN"')
 
         incar_file = open("INCAR", "w")
         for key, value in incar_dict.items():
@@ -556,32 +558,43 @@ class PoscarFileModifier(object):
 
     def make_poscar_rescaled(self, cell_rescale_dict, is_strained=False):
         psr = PoscarAnalyzer(poscar=self.poscar)
-        lattice_parameters = psr.get_lattice_parameters
-        atom_positions = psr.get_atom_positions_direct
-        element_names = psr.get_element_names
-        atom_amounts = psr.get_atom_amounts
+        lattice_parameters_old = psr.get_lattice_parameters()
+        atom_positions = psr.get_atom_positions_direct()
+        element_names = psr.get_element_names()
+        atom_amounts = psr.get_atom_amounts()
+
+        #lattice_parameters_x = np.array(cell_rescale_dict["x"])
+        #lattice_parameters_y = np.array(cell_rescale_dict["y"])
+        #lattice_parameters_z = np.array(cell_rescale_dict["z"])
+        #print lattice_parameters_x
+        #print lattice_parameters_y
+        #print lattice_parameters_z
+        #lattice_parameters = np.concatenate((lattice_parameters_x, lattice_parameters_y))
+        #lattice_parameters = np.concatenate((lattice_parameters, lattice_parameters_z))
+        lattice_parameters = np.array((cell_rescale_dict["x"], cell_rescale_dict["y"], cell_rescale_dict["z"]))
+        #print lattice_parameters
 
         for key in cell_rescale_dict.keys():
             if key == "x":
-                new_cell_length = float(cell_rescale_dict[key])
-                old_cell_length = math.sqrt((lattice_parameters[0][0])**2+(lattice_parameters[0][1])**2+(lattice_parameters[0][2])**2)
-                lattice_parameters[0][0] = lattice_parameters[0][0]*(new_cell_length/old_cell_length)
+                new_cell_length = math.sqrt((lattice_parameters[0][0])**2+(lattice_parameters[0][1])**2+(lattice_parameters[0][2])**2)
+                old_cell_length = math.sqrt((lattice_parameters_old[0][0])**2+(lattice_parameters_old[0][1])**2+(lattice_parameters_old[0][2])**2)
+                #lattice_parameters[0][0] = lattice_parameters[0][0]*(new_cell_length/old_cell_length)
                 if is_strained == bool(False):
                     for index in range(len(atom_positions[-1])):
                         atom_positions[0][index] *= atom_positions[0][index]*(old_cell_length/new_cell_length)
 
             if key == "y":
-                new_cell_length = float(cell_rescale_dict[key])
-                old_cell_length = math.sqrt((lattice_parameters[1][0])**2+(lattice_parameters[1][1])**2+(lattice_parameters[1][2])**2)
-                lattice_parameters[1][1] = lattice_parameters[1][1]*(new_cell_length/old_cell_length)
+                new_cell_length = math.sqrt((lattice_parameters[1][0])**2+(lattice_parameters[1][1])**2+(lattice_parameters[1][2])**2)
+                old_cell_length = math.sqrt((lattice_parameters_old[1][0])**2+(lattice_parameters_old[1][1])**2+(lattice_parameters_old[1][2])**2)
+                #lattice_parameters[1][1] = lattice_parameters[1][1]*(new_cell_length/old_cell_length)
                 if is_strained == bool(False):
                     for index in range(len(atom_positions[-1])):
                         atom_positions[1][index] = atom_positions[1][index]*(old_cell_length/new_cell_length)
 
             if key == "z":
-                new_cell_length = float(cell_rescale_dict[key])
-                old_cell_length = math.sqrt((lattice_parameters[2][0])**2+(lattice_parameters[2][1])**2+(lattice_parameters[2][2])**2)
-                lattice_parameters[2][2] = lattice_parameters[2][2]*(new_cell_length/old_cell_length)
+                new_cell_length = math.sqrt((lattice_parameters[2][0])**2+(lattice_parameters[2][1])**2+(lattice_parameters[2][2])**2)
+                old_cell_length = math.sqrt((lattice_parameters_old[2][0])**2+(lattice_parameters_old[2][1])**2+(lattice_parameters_old[2][2])**2)
+                #lattice_parameters[2][2] = lattice_parameters[2][2]*(new_cell_length/old_cell_length)
                 if is_strained == bool(False):
                     for index in range(len(atom_positions[-1])):
                         atom_positions[2][index] = atom_positions[2][index]*(old_cell_length/new_cell_length)
@@ -604,10 +617,16 @@ class PoscarFileModifier(object):
             poscar_scaled.write(str(lattice_parameters[2][0])+" "+str(lattice_parameters[2][1])+" "+str(lattice_parameters[2][2])+"\n")
             line_count += 1
         if line_count == 5:
-            poscar_scaled.write(str(element_names[0])+" "+str(element_names[1])+" "+str(element_names[2])+"\n")
+            #poscar_scaled.write(str(element_names[0])+" "+str(element_names[1])+" "+str(element_names[2])+"\n")
+            for element_name in element_names:
+                poscar_scaled.write(str(element_name)+" ")
+            poscar_scaled.write("\n")
             line_count += 1
         if line_count == 6:
-            poscar_scaled.write(str(atom_amounts[0])+" "+str(atom_amounts[1])+" "+str(atom_amounts[2])+"\n")
+            for atom_amount in atom_amounts:
+                poscar_scaled.write(str(atom_amount)+" ")
+            #poscar_scaled.write(str(atom_amounts[0])+" "+str(atom_amounts[1])+" "+str(atom_amounts[2])+"\n")
+            poscar_scaled.write("\n")
             line_count += 1
         if line_count == 7:
             poscar_scaled.write("Selective Dynamics"+"\n")
@@ -647,7 +666,7 @@ class PoscarFileModifier(object):
         return poscar
 
     def make_poscar_with_vacancy(self, vacancy_species, max_supercell_size):
-        element_names = PoscarAnalyzer(poscar=self.poscar).get_element_names
+        element_names = PoscarAnalyzer(poscar=self.poscar).get_element_names()
         count = 1
         structure = Structure.from_file(self.poscar)
         poscar_list = []
@@ -683,8 +702,8 @@ class PoscarFileModifier(object):
             poscar.write_file(poscar_placeholder)
 
             psr = PoscarAnalyzer(poscar=poscar_placeholder)
-            atom_coordinates = psr.get_atom_positions_direct
-            total_atoms = psr.get_total_atoms
+            atom_coordinates = psr.get_atom_positions_direct()
+            total_atoms = psr.get_total_atoms()
             atom_coord_min = min(atom_coordinates[2])
             for index in range(len(atom_coordinates[2])):
                 atom_coordinates[2][index] -= atom_coord_min
@@ -719,7 +738,7 @@ class PoscarFileModifier(object):
                 # Keep removing layers until the desired number of layers has been reached
                 while surface_layer_count < surface_trimming_dict[key]:
                     poscar_slab = open(self.poscar, "r")
-                    element_names = PoscarAnalyzer(poscar=self.poscar).get_element_names
+                    element_names = PoscarAnalyzer(poscar=self.poscar).get_element_names()
                     list_z_coords = []; list_z_coords_unique = []; trimmed_slab_coords = [];
                     # Specify where coordinates start in POSCAR, whether SD has been specified or not
                     line_where_coords_start = 8
@@ -763,10 +782,10 @@ class PoscarFileModifier(object):
                     for entry in element_names:
                         atom_count = 0
                         for line in trimmed_slab_coords:
-                            if entry in line:
-                                atom_count += 1
+                            #if entry in line:
+                            atom_count += 1
                         atom_count_list.append(atom_count)
-                    print atom_count_list
+                    #print atom_count_list
 
                     poscar_slab = open(self.poscar, "r")
                     line_count = 0
@@ -789,7 +808,7 @@ class PoscarFileModifier(object):
 
                     poscar_slab_trimmed.close()
                     poscar_slab.close()
-                    shutil.move(os.getcwd() + "/" + poscar_placeholder, os.getcwd() + "/" + self.poscar)
+                    shutil.move(os.getcwd() + "/" + "POSCAR_placeholder", os.getcwd() + "/" + "POSCAR")
                     surface_layer_count += 1
         structure = Structure.from_file(self.poscar)
         poscar = Poscar(structure=structure)
@@ -798,13 +817,13 @@ class PoscarFileModifier(object):
     def add_selective_dynamics(self, number_of_layers, top_and_bottom = True, layer_thickness=2.0):
         #Typically a z_tolerance equal to 0.5*layer_spacing - delta will make a single layer marked "T T T".
         pa = PoscarAnalyzer(poscar=self.poscar)
-        lattice_parameters = pa.get_lattice_parameters
+        lattice_parameters = pa.get_lattice_parameters()
         # Normalize layer thickness by c lattice parameter
         layer_thickness = layer_thickness/math.sqrt(lattice_parameters[2][0]**2+lattice_parameters[2][1]**2+lattice_parameters[2][2]**2)
         #delta = 0.25*layer_thickness
         #z_tolerance = (0.5*layer_thickness) + (layer_thickness*(number_of_layers-1)) - delta
         z_tolerance = (0.5*layer_thickness) + (layer_thickness*(number_of_layers-1))
-        atom_positions = pa.get_atom_positions_direct
+        atom_positions = pa.get_atom_positions_direct()
 
         # Create selective dynamics selection based on z-axis atom position
         z_coords = []
@@ -859,7 +878,8 @@ class PoscarFileModifier(object):
 
         poscar_nosd.close()
         poscar_sd.close()
-        shutil.move(os.getcwd() + "/" + str(poscar_sd), os.getcwd() + "/" + self.poscar)
+        #shutil.move(os.getcwd() + "/" + str(poscar_sd), os.getcwd() + "/" + self.poscar)
+        shutil.move(os.getcwd() + "/" + "POSCAR_placeholder", os.getcwd() + "/" + "POSCAR")
         structure = Structure.from_file(self.poscar)
         poscar = Poscar(structure=structure)
         return poscar
