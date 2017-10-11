@@ -8,7 +8,8 @@ import sys
 import logging
 from VASP_Analyzer import JobMonitor, DirectoryUtilities
 
-def main(resubmit_incomplete_jobs=False, submit_queued_jobs=False, resubmit_crashed_jobs=False):
+def main(resubmit_incomplete_jobs='False', submit_queued_jobs='False', resubmit_crashed_jobs='False'):
+
     # Create log file
     logging.basicConfig(filename='job_monitor.log', level=logging.INFO)
 
@@ -29,21 +30,21 @@ def main(resubmit_incomplete_jobs=False, submit_queued_jobs=False, resubmit_cras
     crashed_job_dirs = jobmonitor._get_crashed_jobs(directory_list=parsed_directory_list)
     nonstarted_job_dirs, old_job_dirs, current_job_dirs = jobmonitor._get_nonstarted_and_old_jobs(directory_list=parsed_directory_list)
 
-    if resubmit_incomplete_jobs == bool(True):
+    if resubmit_incomplete_jobs == 'True':
         resubmitted_jobs = jobmonitor._resubmit_incomplete_jobs(incomplete_job_dirs=incomplete_job_dirs, old_job_dirs=old_job_dirs)
         logging.info('Finished resubmitting incomplete jobs')
-    elif resubmit_incomplete_jobs == bool(False):
+    elif resubmit_incomplete_jobs == 'False':
         logging.info('You have chosen not to resubmit incomplete jobs')
         resubmitted_jobs = []
-    if submit_queued_jobs == bool(True):
+    if submit_queued_jobs == 'True':
         submitted_new_jobs = jobmonitor._submit_nonstarted_jobs(nonstarted_job_dirs=nonstarted_job_dirs, old_job_dirs=old_job_dirs)
         logging.info('Finished submitting new jobs')
-    elif submit_queued_jobs == bool(False):
+    elif submit_queued_jobs == 'False':
         logging.info('You have chosen not to submit jobs that have not been started yet')
         submitted_new_jobs = []
-    if resubmit_crashed_jobs == bool(True):
+    if resubmit_crashed_jobs == 'True':
         resubmitted_crashed_jobs = jobmonitor._resubmit_crashed_jobs(crashed_job_dirs=crashed_job_dirs, old_job_dirs=old_job_dirs)
-    elif resubmit_crashed_jobs == bool(False):
+    elif resubmit_crashed_jobs == 'False':
         logging.info('You have chosen not resubmit jobs that previously crashed')
         resubmitted_crashed_jobs = []
 
@@ -57,18 +58,18 @@ def main(resubmit_incomplete_jobs=False, submit_queued_jobs=False, resubmit_cras
 if __name__ == "__main__":
     input = []
     try:
-        if len(sys.argv[0]) > 0:
-            input.append(sys.argv[0])
-        elif len(sys.argv[0]) == 0:
-            input.append(bool(False))
         if len(sys.argv[1]) > 0:
             input.append(sys.argv[1])
         elif len(sys.argv[1]) == 0:
-            input.append(bool(False))
+            input.append('False')
         if len(sys.argv[2]) > 0:
             input.append(sys.argv[2])
         elif len(sys.argv[2]) == 0:
-            input.append(bool(False))
-        main(resubmit_incomplete_jobs=bool(input[0]), submit_queued_jobs=bool(input[1]), resubmit_crashed_jobs=bool(input[2]))
+            input.append('False')
+        if len(sys.argv[3]) > 0:
+            input.append(sys.argv[3])
+        elif len(sys.argv[3]) == 0:
+            input.append('False')
+        main(resubmit_incomplete_jobs=input[0], submit_queued_jobs=input[1], resubmit_crashed_jobs=input[2])
     except(IndexError):
-        main(resubmit_incomplete_jobs=bool(False), submit_queued_jobs=bool(False), resubmit_crashed_jobs=bool(False))
+        main(resubmit_incomplete_jobs='False', submit_queued_jobs='False', resubmit_crashed_jobs='False')
