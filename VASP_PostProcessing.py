@@ -1067,7 +1067,7 @@ class StabilityAnalyzer(object):
         decomp_file.close()
         stable_entries_file.close()
 
-        return phasediagram
+        return phasediagram, energy_above_hull
 
     def _calc_GGA_GGAU_shifted_energy(self, composition=None):
         # A note of caution for this function and all stability analysis: for your answers to be meaningful, you need
