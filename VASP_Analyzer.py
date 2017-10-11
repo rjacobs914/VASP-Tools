@@ -791,7 +791,10 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
                     os.chdir(continue_dir)
                     shutil.move("CONTCAR", "POSCAR")
                     logging.info("Making new continuation folder and resubmitting the job from directory %s" % (continue_dir))
-                    subprocess.Popen(['sbatch', 'submit.sh']).communicate()
+                    try:
+                        subprocess.Popen(['sbatch', 'submit.sh']).communicate()
+                    except(OSError):
+                        subprocess.Popen(['qsub', 'submit.sh']).communicate()
                     resubmitted_job_dirs.append(continue_dir)
                 except(OSError):
                     continue
@@ -840,7 +843,10 @@ class JobMonitor(JobAnalyzer, DirectoryUtilities, TimeUtilities):
                     incartemp.close()
                     incar.close()
                     shutil.move("INCARtemp", "INCAR")
-                    subprocess.Popen(['sbatch', 'submit.sh']).communicate()
+                    try:
+                        subprocess.Popen(['sbatch', 'submit.sh']).communicate()
+                    except(OSError):
+                        subprocess.Popen(['qsub', 'submit.sh']).communicate()
                     resubmitted_crashed_job_dirs.append(continue_dir)
 
                 except(OSError):
