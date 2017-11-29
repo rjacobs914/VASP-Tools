@@ -581,7 +581,7 @@ class PoscarFileModifier(object):
                 #lattice_parameters[0][0] = lattice_parameters[0][0]*(new_cell_length/old_cell_length)
                 if is_strained == bool(False):
                     for index in range(len(atom_positions[-1])):
-                        atom_positions[0][index] *= atom_positions[0][index]*(old_cell_length/new_cell_length)
+                        atom_positions[0][index] = atom_positions[0][index]*(old_cell_length/new_cell_length)
 
             if key == "y":
                 new_cell_length = math.sqrt((lattice_parameters[1][0])**2+(lattice_parameters[1][1])**2+(lattice_parameters[1][2])**2)
