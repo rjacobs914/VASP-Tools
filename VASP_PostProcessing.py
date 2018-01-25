@@ -1,6 +1,13 @@
 __author__ = 'Ryan Jacobs'
-__version__ = '2.0'
-__date__ = 'Last updated March 27, 2017'
+
+"""
+Key dependencies:
+
+Pymatgen: pip install pymatgen=='4.2.0' --user
+MPinterfaces: pip install MPInterfaces_Latest --user
+
+"""
+
 """
 VASP_PostProcessing is a module designed to handle an assortment of useful post-processing tasks and calculations
 based on completed DFT data, including: DOS analysis, thermodynamic stability, Wulff construction, calculation of
@@ -104,7 +111,7 @@ class LocpotAnalyzer(object):
         bold = excel_file.add_format({'bold': True})
         column_name_dict = {"0" : "Supercell z-coordinate (arb units)", "1" : "Electrostatic potential (eV)"}
         row = 0
-        for key, value in column_name_dict.iteritems():
+        for key, value in column_name_dict.items():
             excel_sheet.write(int(row), int(key), value, bold)
         row = 1
         #values_dict = {"0" : z_coord, "1" : planaravg}
@@ -180,8 +187,8 @@ class LocpotAnalyzer(object):
     def get_empirical_delta_workfunction(self):
         #Obtain the work function difference between the two surfaces using the Helmholtz equation
         #This code assumes the surface is oriented in the c-direction, so that a x b is the surface area
-        dipole = OutcarAnalyzer(self.outcar).get_dipole
-        lattice_parameters = PoscarAnalyzer(self.poscar).get_lattice_parameters
+        dipole = OutcarAnalyzer(self.outcar).get_dipole()
+        lattice_parameters = PoscarAnalyzer(self.poscar).get_lattice_parameters()
         area = lattice_parameters[0][0]*lattice_parameters[1][1]
         delta_workfunction = ((-181)*dipole)/area #units of eV, dipole is in eV-Ang, area, in Ang^2
         return delta_workfunction
@@ -309,12 +316,12 @@ class DiffusionAnalyzerAIMD(object):
         myxdatcar = Xdatcar(self.xdatcar)
         structure_list.extend(myxdatcar.structures)
         count = 0
-        print "Removing %i initial structures from structure list." % self.steps_to_ignore
+        print("Removing %i initial structures from structure list." % self.steps_to_ignore)
         while count < self.steps_to_ignore:
             structure_list.pop(0)
             count += 1
-        print "%i structures left to analyze." % len(structure_list)
-        print "Running diffusion analyzer."
+        print("%i structures left to analyze." % len(structure_list))
+        print("Running diffusion analyzer.")
         structures = open("structurelist.txt", "w")
         structures.write(str(structure_list))
         structures.close()
@@ -987,7 +994,7 @@ class StabilityAnalyzer(object):
             entries_in_system = self._create_chemical_system_from_MP()
             pd_entry_list = self._create_pdentry()
             for entry in pd_entry_list:
-                print "The PDEntry given for this system is:", entry, " eV/cell"
+                print("The PDEntry given for this system is:", entry, " eV/cell")
 
         elif use_custom_chem_pots == bool(True):
             entries_in_system = self._create_chemical_system_from_MP_and_remove_endmembers(species_to_remove=[key for key in custom_chem_pot_dict.keys()])
@@ -998,9 +1005,9 @@ class StabilityAnalyzer(object):
                 entries_in_system.append(chempot_pdentry)
                 pd_entry_list_chempots.append(chempot_pdentry)
             for entry in pd_entry_list:
-                print "The PDEntry given for this system is:", entry, " eV/cell"
+                print("The PDEntry given for this system is:", entry, " eV/cell")
             for entry in pd_entry_list_chempots:
-                print "The PDEntry of new chemical potential is:", entry, " eV"
+                print("The PDEntry of new chemical potential is:", entry, " eV")
 
         # Add all new PDEntry objects from pd_entry_list to the chemical system for phase stability analysis
         if len(pd_entry_list) > 0:
@@ -1021,7 +1028,7 @@ class StabilityAnalyzer(object):
                 pd_entry_list.append(organic_pdentry)
                 entries_in_system.append(organic_pdentry)
                 organic_count += 1
-            print "%i organic molecules have been added to the chemical system!" % organic_count
+            print("%i organic molecules have been added to the chemical system!" % organic_count)
 
         phasediagram = PhaseDiagram(entries=entries_in_system)
         phasediagram_analyzer = PDAnalyzer(phasediagram)
@@ -1037,14 +1044,14 @@ class StabilityAnalyzer(object):
 
 
         for entry in pd_entry_list:
-            print "Analyzing entry:", entry
+            print("Analyzing entry:", entry)
             energy_above_hull = phasediagram_analyzer.get_e_above_hull(entry=entry)
             energy_above_hull *= 1000 # in units of meV/atom
-            print "The energy above hull (in meV/atom) for this system is:", energy_above_hull
+            print("The energy above hull (in meV/atom) for this system is:", energy_above_hull)
             eabove_file.write(str(energy_above_hull)+"\n")
             e_form = phasediagram.get_form_energy_per_atom(entry=entry)
             #e_form *= 1000 # in units of meV/atom
-            print "The formation energy (in eV/atom) for this system is:", e_form
+            print("The formation energy (in eV/atom) for this system is:", e_form)
             eform_file.write(str(e_form)+"\n")
 
         # Write the stable entries to a file
@@ -1082,25 +1089,25 @@ class StabilityAnalyzer(object):
             oa = OszicarAnalyzer(oszicar=self.oszicar, poscar=self.poscar)
             energy = oa.get_energy()
             composition_dict = pa.get_composition_dict()
-            print "The unshifted energy per cell is:", energy
+            print("The unshifted energy per cell is:", energy)
             # Find which elements in material correspond to those that need shifting, if any, and apply energy shift
             for key in composition_dict.keys():
                 if key in energy_shift_dict.keys():
                     energy -= energy_shift_dict[key]*composition_dict[key]
-            print "The shifted energy per cell is:", energy
+            print("The shifted energy per cell is:", energy)
             energy_list.append(energy)
 
         elif self.get_data_from_VASP_files == bool(False):
             if len(self.composition_energy) > 0:
                 for index, entry in enumerate(self.composition_energy):
                     energy = entry
-                    print "The unshifted energy is:", energy
+                    print("The unshifted energy is:", energy)
 
                     # Find which elements in material correspond to those that need shifting, if any, and apply energy shift
                     for key in self.composition_dict[index].keys():
                         if key in energy_shift_dict.keys():
                             energy -= energy_shift_dict[key]*self.composition_dict[index][key]
-                    print "The shifted energy is:", energy
+                    print("The shifted energy is:", energy)
                     energy_list.append(energy)
 
         return energy_list
@@ -1124,12 +1131,12 @@ class StabilityAnalyzer(object):
             if len(self.additional_elements_to_include) > 0:
                 for entry in self.additional_elements_to_include:
                     if entry not in element_names:
-                        print "%s is being added to the list of elements ..." % str(entry)
+                        print("%s is being added to the list of elements ..." % str(entry))
                         element_names.append(entry)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            print "Getting materials info from MP for the elements %s" % element_names, ", this may take a minute ..."
+            print("Getting materials info from MP for the elements %s" % element_names, ", this may take a minute ...")
             entries_in_system = mp.get_entries_in_chemsys(element_names)
 
         return entries_in_system
@@ -1147,7 +1154,7 @@ class StabilityAnalyzer(object):
             for index, composition in enumerate(self.composition_dict):
                 comp = Composition(composition)
                 pd_entry = PDEntry(comp, energy_list[index])
-                print "The PDEntry given for this system is:", pd_entry, " eV/cell"
+                print("The PDEntry given for this system is:", pd_entry, " eV/cell")
                 pd_entry_list.append(pd_entry)
         return pd_entry_list
 
@@ -1178,7 +1185,7 @@ class StabilityAnalyzer(object):
         mp_list_I = ["mp-23153", "mp-639751", "mp-601148", "mp-684663"]
         mp_list_together = [mp_list_O, mp_list_H, mp_list_N, mp_list_F, mp_list_Cl, mp_list_Br, mp_list_I]
         mp_dict = {"O": 0, "H": 1, "N": 2, "F": 3, "Cl": 4, "Br": 5, "I": 6}
-        print 'Species to remove', species_to_remove
+        print('Species to remove', species_to_remove)
 
         for species in species_to_remove:
             count = 0
@@ -1187,7 +1194,7 @@ class StabilityAnalyzer(object):
                 for entry in entries_in_system:
                     if entry != pd_entry:
                         if entry.entry_id in mp_list_to_use:
-                            print "removing an %s entry," % species, " entry ID number", entry.entry_id
+                            print("removing an %s entry," % species, " entry ID number", entry.entry_id)
                             entries_in_system.remove(entry)
                             count += 1
 
@@ -1197,7 +1204,7 @@ class StabilityAnalyzer(object):
                 for entry in self.material_ids_to_remove:
                     for mpentry in entries_in_system:
                         if mpentry.entry_id == entry:
-                            print "removing material %s" % mpentry.entry_id
+                            print("removing material %s" % mpentry.entry_id)
                             entries_in_system.remove(mpentry)
 
         return entries_in_system
@@ -1306,11 +1313,11 @@ class StabilityAnalyzer(object):
                 organic_compositions.append(entry1)
                 organic_energies.append(entry2)
 
-        print "Adding %i organic molecules" % len(organic_compositions)
-        print "The list of organic molecules is:"
-        print organic_compositions
-        print "The list of organic molecule energies is:"
-        print organic_energies
+        print("Adding %i organic molecules" % len(organic_compositions))
+        print("The list of organic molecules is:")
+        print(organic_compositions)
+        print("The list of organic molecule energies is:")
+        print(organic_energies)
 
         return organic_compositions, organic_energies
 
@@ -1608,7 +1615,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (EN2_PBE - N2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print "WARNING: You are calculating N2 energy with the materials project energy shift, this has not been well-tested!!!"
+                    print("WARNING: You are calculating N2 energy with the materials project energy shift, this has not been well-tested!!!")
                     mu = (EN2_PBE + N_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         if self.temperature > 500:
@@ -1621,7 +1628,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (EN2_PBE - N2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print "WARNING: You are calculating N2 energy with the materials project energy shift, this has not been well-tested!!!"
+                    print("WARNING: You are calculating N2 energy with the materials project energy shift, this has not been well-tested!!!")
                     mu = (EN2_PBE + N_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1661,7 +1668,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (EF2_PBE - F2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print "WARNING: You are calculating F2 energy with the materials project energy shift, this has not been well-tested!!!"
+                    print("WARNING: You are calculating F2 energy with the materials project energy shift, this has not been well-tested!!!")
                     mu = (EF2_PBE + F_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1707,7 +1714,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (ECl2_PBE - Cl2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print "WARNING: You are calculating Cl2 energy with the materials project energy shift, this has not been well-tested!!!"
+                    print("WARNING: You are calculating Cl2 energy with the materials project energy shift, this has not been well-tested!!!")
                     mu = (ECl2_PBE + Cl_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         if self.temperature > 500:
@@ -1720,7 +1727,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (ECl2_PBE - Cl2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print "WARNING: You are calculating Cl2 energy with the materials project energy shift, this has not been well-tested!!!"
+                    print("WARNING: You are calculating Cl2 energy with the materials project energy shift, this has not been well-tested!!!")
                     mu = (ECl2_PBE + Cl_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1762,7 +1769,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (EBr2_PBE - Br2_shift_from0K + H_vap_Br2 + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print "NOTE: There is currently no energy shift for Br2 implemented in Materials Project. You will get the same answer as if no shift is applied!"
+                    print("NOTE: There is currently no energy shift for Br2 implemented in Materials Project. You will get the same answer as if no shift is applied!")
                     mu = (EBr2_PBE - Br2_shift_from0K + H_vap_Br2 + Br_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1822,7 +1829,7 @@ class ChemicalPotentialAnalyzer():
             if self.energy_shift == False:
                 mu = (EI2_PBE - I2_shift_from0K + H_fusion_I2 + H_vap_I2 + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
             if self.energy_shift == True:
-                print "NOTE: There is currently no energy shift for I2 implemented in Materials Project. You will get the same answer as if no shift is applied!"
+                print("NOTE: There is currently no energy shift for I2 implemented in Materials Project. You will get the same answer as if no shift is applied!")
                 mu = (EI2_PBE - I2_shift_from0K + H_fusion_I2 + H_vap_I2 + I_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1830,13 +1837,13 @@ class ChemicalPotentialAnalyzer():
     def _check_input(self):
         func_list = ["pw91", "PW91", "PBE", "pbe"]
         if self.temperature <= 0:
-            print "ERROR: You have selected on a nonsensical temperature. Exiting..."
+            print("ERROR: You have selected on a nonsensical temperature. Exiting...")
             exit()
         if self.pressure <= 0:
-            print "ERROR: You have selected on a nonsensical pressure. Exiting..."
+            print("ERROR: You have selected on a nonsensical pressure. Exiting...")
             exit()
         if self.functional not in func_list:
-            print "ERROR: You must specify one of either PW91 or PBE functionals. Exiting..."
+            print("ERROR: You must specify one of either PW91 or PBE functionals. Exiting...")
             exit()
         # if self.energy_shift == "True":
         #    print "Applying the shift corrections"
