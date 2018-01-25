@@ -1,6 +1,13 @@
 __author__ = 'Ryan Jacobs'
-__version__ = '2.0'
-__date__ = 'Last updated March 27, 2017'
+
+"""
+Key dependencies:
+
+Pymatgen: pip install pymatgen=='4.2.0' --user
+MPinterfaces: pip install MPInterfaces_Latest --user
+
+"""
+
 """
 VASP_Analyzer is a module designed to handle basic analysis of VASP input and output files. It also contains some
 miscellaneous job utilities designed to gather completed job data and assess the convergence of jobs.
@@ -19,7 +26,6 @@ import subprocess
 import logging
 import shutil
 import pandas as pd
-from pprint import pprint
 
 class PoscarAnalyzer(object):
     """Class used to obtain basic, useful quantities from the POSCAR file.
@@ -436,8 +442,8 @@ class OszicarAnalyzer(object):
         return energy
 
     def get_energy_per_atom(self):
-        energy = self.get_energy
-        total_atoms = PoscarAnalyzer(self.poscar).get_total_atoms
+        energy = self.get_energy()
+        total_atoms = PoscarAnalyzer(self.poscar).get_total_atoms()
         energy_per_atom = energy/total_atoms
         return energy_per_atom
 
@@ -514,7 +520,6 @@ class DirectoryUtilities(object):
 
 class TimeUtilities(object):
     """Class to perform basic time-related tasks. The user should not call any methods here
-
     """
     @staticmethod
     def _parse_updated_time(last_updated_time):
@@ -574,7 +579,6 @@ class TimeUtilities(object):
 
 class JobAnalyzer(object):
     """Class to perform DFT job convergence analysis. The user should not call any methods here
-
     """
     def __init__(self):
         pass
@@ -986,7 +990,7 @@ class VASPdata(object):
                         else:
                             datadict[filecount] = float(file_data[0])
                     except (IOError, IndexError):
-                        print "File of type %s was not found, or there was a problem reading the file" % str(f)
+                        print("File of type %s was not found, or there was a problem reading the file" % str(f))
                     filecount += 1
                 dataframe_data.append(datadict)
                 datadict[len(custom_file_list)+1] = directory
