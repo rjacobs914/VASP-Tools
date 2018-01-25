@@ -1,6 +1,13 @@
 __author__ = 'Ryan Jacobs'
-__version__ = '2.0'
-__date__ = 'Last updated March 27, 2017'
+
+"""
+Key dependencies:
+
+Pymatgen: pip install pymatgen=='4.2.0' --user
+MPinterfaces: pip install MPInterfaces_Latest --user
+
+"""
+
 """
 VASP_Setup is a module designed to write the necessary VASP input files to conduct a DFT calculation, namely the
 POSCAR, POTCAR, KPOINTS and INCAR and submission script files. There are also additional routines to aid in construction
@@ -561,7 +568,6 @@ class PoscarFileModifier(object):
             if key == "x":
                 new_cell_length = float(cell_rescale_dict[key])
                 old_cell_length = math.sqrt((lattice_parameters[0][0])**2+(lattice_parameters[0][1])**2+(lattice_parameters[0][2])**2)
-                print new_cell_length, old_cell_length
                 lattice_parameters[0][0] = lattice_parameters[0][0]*(new_cell_length/old_cell_length)
                 if is_strained == bool(False):
                     for index in range(len(atom_positions[-1])):
@@ -737,10 +743,6 @@ class PoscarFileModifier(object):
                         line_element_identity[element_names[i]] = atom_coord_lines
                         count += atom_amounts[i]
 
-                    print atom_amounts
-                    print element_names
-                    print line_element_identity
-
                     line_count = 0
                     poscar_slab = open(self.poscar, "r")
                     for line in poscar_slab:
@@ -773,9 +775,6 @@ class PoscarFileModifier(object):
                                 lines_to_keep.append(line_count)
                     poscar_slab.close()
 
-                    print "lines to keep"
-                    print lines_to_keep
-
                     poscar_placeholder = "POSCAR_placeholder"
                     poscar_slab_trimmed = open(poscar_placeholder, "w")
                     atom_count_list = []
@@ -786,18 +785,6 @@ class PoscarFileModifier(object):
                             if entry2 in line_element_identity[entry]:
                                 atom_count += 1
                         atom_count_list.append(atom_count)
-                    print "atom count list"
-                    print atom_count_list
-
-                    #for entry in element_names:
-                    #    print entry
-                    #    atom_count = 0
-                    #    for line in trimmed_slab_coords:
-                    #        #if entry in line:
-                    #        atom_count += 1
-                    #    atom_count_list.append(atom_count)
-                    #print "atom count list"
-                    #print atom_count_list
 
                     poscar_slab = open(self.poscar, "r")
                     line_count = 0
@@ -823,8 +810,6 @@ class PoscarFileModifier(object):
                     shutil.move(os.getcwd() + "/" + "POSCAR_placeholder", os.getcwd() + "/" + "POSCAR")
                     surface_layer_count += 1
         structure = Structure.from_file(self.poscar)
-        #structure = Structure.from_file("POSCAR")
-        print structure
         poscar = Poscar(structure=structure)
         return poscar
         
