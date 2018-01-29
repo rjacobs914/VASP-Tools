@@ -990,7 +990,7 @@ class VASPdata(object):
                         else:
                             datadict[filecount] = float(file_data[0])
                     except (IOError, IndexError):
-                        print("File of type %s was not found, or there was a problem reading the file" % str(f))
+                        print "File of type %s was not found, or there was a problem reading the file" % str(f)
                     filecount += 1
                 dataframe_data.append(datadict)
                 datadict[len(custom_file_list)+1] = directory

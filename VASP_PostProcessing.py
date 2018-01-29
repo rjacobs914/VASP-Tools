@@ -255,7 +255,7 @@ class DiffusionAnalyzerAIMD(object):
         diffusing_species: (str) The name of the element to calculate the diffusion coefficient of
         temperature: (int) The temperature (in K) of the AIMD simulation
         timestep: (int) The timestep (in femtoseconds) of the AIMD simulation
-        xdatcar: (str) The name of an XDATCAR file
+        xdatcar: (str) The name of an XDATCAR file, or list of XDATCAR files to concatenate together (e.g. from multiple runs)
         plot_msd: (bool) Whether or not to plot the MSD.
 
         **It is advised that the following variables be left as their default values, but if you change them be sure to
@@ -313,15 +313,24 @@ class DiffusionAnalyzerAIMD(object):
 
     def _prepare_xdatcar_from_dirs(self):
         structure_list = []
-        myxdatcar = Xdatcar(self.xdatcar)
-        structure_list.extend(myxdatcar.structures)
+        if type(self.xdatcar) is str:
+            myxdatcar = Xdatcar(self.xdatcar)
+            structure_list.extend(myxdatcar.structures)
+        elif type(self.xdatcar) is list:
+            for xdatcar in self.xdatcar:
+                myxdatcar = Xdatcar(xdatcar)
+                structure_list.extend(myxdatcar.structures)
+        else:
+            print 'Invalid data type specified for xdatcar, must be string or list of xdatcar file names'
+            exit()
+        print 'structure list', structure_list
         count = 0
-        print("Removing %i initial structures from structure list." % self.steps_to_ignore)
+        print "Removing %i initial structures from structure list." % self.steps_to_ignore
         while count < self.steps_to_ignore:
             structure_list.pop(0)
             count += 1
-        print("%i structures left to analyze." % len(structure_list))
-        print("Running diffusion analyzer.")
+        print "%i structures left to analyze." % len(structure_list)
+        print "Running diffusion analyzer."
         structures = open("structurelist.txt", "w")
         structures.write(str(structure_list))
         structures.close()
@@ -353,6 +362,7 @@ class DoscarAnalyzer(object):
                 args:
                     temperature : (int) The effective DOS is T-dependent. Specify a T value (in K) to do the analysis.
     """
+
     def __init__(self, poscar="POSCAR", incar="INCAR", outcar="OUTCAR", doscar="DOSCAR", energy_cutoff=0):
         self.poscar = poscar
         self.incar = incar
@@ -361,61 +371,123 @@ class DoscarAnalyzer(object):
         self.energy_cutoff = energy_cutoff
 
     def plot_total_dos(self):
-        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list, dos_f_list = self._parse_dos_atom_type()
         energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
         dosdata, total_dos = self._cleanup_projected_dos()
         number_of_atoms = PoscarAnalyzer(poscar=self.poscar).get_total_atoms()
 
         total_dos_down_list_neg = []
         for index in range(len(total_dos_down_list)):
-            total_dos_down_list_neg.append(-1*total_dos_down_list[index])
+            total_dos_down_list_neg.append(-1 * total_dos_down_list[index])
 
         total_dos_normalized = []
         for index in range(len(total_dos)):
-            total_dos_normalized.append(total_dos[index]/number_of_atoms)
+            total_dos_normalized.append(total_dos[index] / number_of_atoms)
 
-        pyplot.figure(figsize=(8,6), dpi=80)
+        pyplot.figure(figsize=(8, 6), dpi=80)
         pyplot.plot(energy, total_dos_up_list, 'b', label='Total DOS spin up')
         pyplot.plot(energy, total_dos_down_list_neg, 'g', label='Total DOS spin down')
-        #pyplot.plot(energy, total_dos_normalized, 'k', label='Total DOS')
-        pyplot.plot([0,0], [min(total_dos_up_list), max(total_dos_up_list)], 'k-', label='Fermi energy')
+        # pyplot.plot(energy, total_dos_normalized, 'k', label='Total DOS')
+        pyplot.plot([0, 0], [min(total_dos_up_list), max(total_dos_up_list)], 'k-', label='Fermi energy')
         pyplot.xlabel('Energy (E-EFermi, eV)')
         pyplot.ylabel('Total Densities of States (states/eV-atom)')
         pyplot.title('Total Density of States')
         pyplot.legend()
-        #pyplot.ylim([-1*max(total_dos_down_list), max(total_dos_up_list)])
+        # pyplot.ylim([-1*max(total_dos_down_list), max(total_dos_up_list)])
         pyplot.ylim([-5, 5])
         pyplot.xlim([-10, 10])
         pyplot.savefig('TotalDOS.pdf')
         return None
 
-    def plot_projected_dos(self):
-        sumtotaldosup, sumtotaldosdown, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+    def plot_projected_dos(self, plot_labels='True', use_custom_color_type='False'):
+        sumtotaldosup, sumtotaldosdown, dos_s_list, dos_p_list, dos_d_list, dos_f_list = self._parse_dos_atom_type()
         energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
         nedos = self._calc_nedos()
         atom_amounts = PoscarAnalyzer(self.poscar).get_atom_amounts()
         element_names = PoscarAnalyzer(self.poscar).get_element_names()
 
-        pyplot.figure(figsize=(8,6), dpi=80)
-        #Need to normalize and plot PDOS by element type
+        fig = pyplot.figure(figsize=(8, 6), dpi=80, frameon=False)
+        # ax = plt.Axes(fig, [0., 0., 1., 1.])
+        # ax.set_axis_off()
+        # fig.add_axes(ax)
 
+        # ax.imshow(data, cmap=cm)
+        # fig.gca().set_frame_on(False)
+        # Need to normalize and plot PDOS by element type
+        TM_list = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu']
+        RE_list = ['La', 'Gd', 'Sm', 'Pr']
+        AE_list = ['Sr', 'Ba']
+        RE_count = 0
+        TM_count = 0
+        AE_count = 0
         colors = "bgrkybgrkybgrkybgrkybgrky"
         for element_number in range(len(atom_amounts)):
             dos_to_plot_up = []
             dos_to_plot_down = []
             for index in range(nedos):
-                dos_to_plot_up.append((dos_s_list[index + nedos*element_number][0] + dos_p_list[index + nedos*element_number][0] + dos_d_list[index + nedos*element_number][0])/atom_amounts[element_number])
-                dos_to_plot_down.append(-1*(dos_s_list[index + nedos*element_number][1] + dos_p_list[index + nedos*element_number][1] + dos_d_list[index + nedos*element_number][1])/atom_amounts[element_number])
-            pyplot.plot(energy, dos_to_plot_up, color=colors[element_number], label='PDOS for %s' % (element_names[element_number]))
-            pyplot.plot(energy, dos_to_plot_down, color=colors[element_number])
+                dos_to_plot_up.append((dos_s_list[index + nedos * element_number][0] +
+                                       dos_p_list[index + nedos * element_number][0] +
+                                       dos_d_list[index + nedos * element_number][0] +
+                                       dos_f_list[index + nedos * element_number][0]) / atom_amounts[element_number])
+                dos_to_plot_down.append(-1 * (
+                dos_s_list[index + nedos * element_number][1] + dos_p_list[index + nedos * element_number][1] +
+                dos_d_list[index + nedos * element_number][1] + dos_f_list[index + nedos * element_number][1]) /
+                                        atom_amounts[element_number])
 
-        pyplot.xlabel('Energy (E-EFermi, eV)')
-        pyplot.ylabel('Projected Densities of States (states/eV-atom)')
-        pyplot.title('Projected Density of States')
+            if use_custom_color_type == 'True':
+                if element_names[element_number] in RE_list:
+                    if RE_count == 0:
+                        pyplot.plot(energy, dos_to_plot_up, 'g', label=element_names[element_number])
+                        pyplot.plot(energy, dos_to_plot_down, 'g')
+                    if RE_count > 0:
+                        pyplot.plot(energy, dos_to_plot_up, 'g--', label=element_names[element_number])
+                        pyplot.plot(energy, dos_to_plot_down, 'g--')
+                    RE_count += 1
+                if element_names[element_number] in TM_list:
+                    if TM_count == 0:
+                        pyplot.plot(energy, dos_to_plot_up, 'b', label=element_names[element_number])
+                        pyplot.plot(energy, dos_to_plot_down, 'b')
+                    if TM_count > 0:
+                        pyplot.plot(energy, dos_to_plot_up, 'b--', label=element_names[element_number])
+                        pyplot.plot(energy, dos_to_plot_down, 'b--')
+                    TM_count += 1
+                if element_names[element_number] in AE_list:
+                    if AE_count == 0:
+                        pyplot.plot(energy, dos_to_plot_up, 'r', label=element_names[element_number])
+                        pyplot.plot(energy, dos_to_plot_down, 'r')
+                    if AE_count > 0:
+                        pyplot.plot(energy, dos_to_plot_up, 'r--', label=element_names[element_number])
+                        pyplot.plot(energy, dos_to_plot_down, 'r--')
+                    AE_count += 1
+                if element_names[element_number] == 'O':
+                    pyplot.plot(energy, dos_to_plot_up, 'k', label=element_names[element_number])
+                    pyplot.plot(energy, dos_to_plot_down, 'k')
+
+            else:
+                pyplot.plot(energy, dos_to_plot_up, color=colors[element_number], label=element_names[element_number])
+                pyplot.plot(energy, dos_to_plot_down, color=colors[element_number])
+
+        if plot_labels == 'True':
+            pyplot.xlabel('Energy (E-EFermi, eV)')
+            pyplot.ylabel('Projected Densities of States (states/eV-atom)')
+            pyplot.title('Projected Density of States')
+        pyplot.plot([0, 0], [-5, 5], 'k--')
         pyplot.legend()
         pyplot.xlim([-10, 10])
         pyplot.ylim([-5, 5])
-        pyplot.savefig('ProjectedDOS.pdf')
+        # ax = pyplot.Axes(fig, [0., 0., 1., 1.])
+        # ax.set_axis_off()
+        # fig.add_axes(ax)
+        # ax=pyplot.gca()
+        # axesframe = ax.Axes
+        # setp(axesframe, 'color', frame_edgecolor)
+        # setp(axesframe, 'antialiased', True)
+        # setp(axesframe, 'linewidth', 0)
+        # frame = getp(ax, 'frame')
+        # frame.set_visible(False)
+        # pyplot.box(on=None)
+        pyplot.savefig('ProjectedDOS.png', transparent=True, bbox_inches='tight', pad_inches=0, dpi=900)
+
         return None
 
     def get_bandgap_from_dos(self):
@@ -424,7 +496,7 @@ class DoscarAnalyzer(object):
         if Egap < 0.1:
             Egap = 0
 
-        #print "The bandgap of this material from DOS is %s eV" % (Egap)
+        # print "The bandgap of this material from DOS is %s eV" % (Egap)
         bandgapfile = open("bandgap_fromdos.txt", "w")
         Egap = str(Egap)
         bandgapfile.write(Egap)
@@ -433,7 +505,7 @@ class DoscarAnalyzer(object):
 
     def get_O_chargetransfergap(self):
         # Same method as regular bandgap, but now just doing it between occupied and unoccupied O states
-        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list, dos_f_list = self._parse_dos_atom_type()
         energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
         nedos = self._calc_nedos()
         atom_amounts = PoscarAnalyzer(self.poscar).get_atom_amounts()
@@ -443,7 +515,8 @@ class DoscarAnalyzer(object):
 
         # Find which element, if any, is O. This analysis only pertains to O, so throw error if no O found
         if "O" not in element_names:
-            raise TypeError("No oxygen was detected in your element list. The charge transfer gap calculation only pertains to O states. Exiting calculation...")
+            raise TypeError(
+                "No oxygen was detected in your element list. The charge transfer gap calculation only pertains to O states. Exiting calculation...")
 
         # Find out which entry is O and perform charge transfer gap calculation
         for element_number in range(len(element_names)):
@@ -495,7 +568,7 @@ class DoscarAnalyzer(object):
                 if Echgtransgap < 0.1:
                     Echgtransgap = 0
 
-                #print "The charge transfer gap for O in this material is %s eV" % (Echgtransgap)
+                # print "The charge transfer gap for O in this material is %s eV" % (Echgtransgap)
                 bandgapfile = open("chgtransgap.txt", "w")
                 Echgtransgap = str(Echgtransgap)
                 bandgapfile.write(Echgtransgap)
@@ -505,27 +578,34 @@ class DoscarAnalyzer(object):
     def get_bandcenters(self, write_dicts_to_file=True):
         nedos = self._calc_nedos()
         energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
-        sumtotaldosup, sumtotaldosdown, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+        sumtotaldosup, sumtotaldosdown, dos_s_list, dos_p_list, dos_d_list, dos_f_list = self._parse_dos_atom_type()
         pa = PoscarAnalyzer(self.poscar)
         element_names = pa.get_element_names()
         atom_amounts = pa.get_atom_amounts()
 
         band_center_list = []
         band_center_occ_list = []
+        band_center_unocc_list = []
 
         for element_number in range(len(atom_amounts)):
             dos_s_list_E = []
             dos_s_list_total_occ = []
+            dos_s_list_total_unocc = []
             dos_p_list_E = []
             dos_p_list_total_occ = []
+            dos_p_list_total_unocc = []
             dos_d_list_E = []
             dos_d_list_total_occ = []
+            dos_d_list_total_unocc = []
             dos_s_list_total = []
             dos_s_list_E_occ = []
+            dos_s_list_E_unocc = []
             dos_p_list_total = []
             dos_p_list_E_occ = []
+            dos_p_list_E_unocc = []
             dos_d_list_total = []
             dos_d_list_E_occ = []
+            dos_d_list_E_unocc = []
             for index in range(nedos):
                 dos_s_list_total.append(
                     dos_s_list[index + nedos * element_number][0] + dos_s_list[index + nedos * element_number][1])
@@ -546,6 +626,16 @@ class DoscarAnalyzer(object):
                     dos_s_list_E_occ.append(dos_s_list_total[index] * energy[index])
                     dos_p_list_E_occ.append(dos_p_list_total[index] * energy[index])
                     dos_d_list_E_occ.append(dos_d_list_total[index] * energy[index])
+                if index > index_Fermi:
+                    dos_s_list_total_unocc.append(
+                        dos_s_list[index + nedos * element_number][0] + dos_s_list[index + nedos * element_number][1])
+                    dos_p_list_total_unocc.append(
+                        dos_p_list[index + nedos * element_number][0] + dos_p_list[index + nedos * element_number][1])
+                    dos_d_list_total_unocc.append(
+                        dos_d_list[index + nedos * element_number][0] + dos_d_list[index + nedos * element_number][1])
+                    dos_s_list_E_unocc.append(dos_s_list_total[index] * energy[index])
+                    dos_p_list_E_unocc.append(dos_p_list_total[index] * energy[index])
+                    dos_d_list_E_unocc.append(dos_d_list_total[index] * energy[index])
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -561,8 +651,15 @@ class DoscarAnalyzer(object):
                                    integrate.cumtrapz(dos_p_list_total_occ, energy_occ)[-1]
                 d_bandcenter_occ = integrate.cumtrapz(dos_d_list_E_occ, energy_occ)[-1] / \
                                    integrate.cumtrapz(dos_d_list_total_occ, energy_occ)[-1]
+                s_bandcenter_unocc = integrate.cumtrapz(dos_s_list_E_unocc, energy_unocc)[-1] / \
+                                     integrate.cumtrapz(dos_s_list_total_unocc, energy_unocc)[-1]
+                p_bandcenter_unocc = integrate.cumtrapz(dos_p_list_E_unocc, energy_unocc)[-1] / \
+                                     integrate.cumtrapz(dos_p_list_total_unocc, energy_unocc)[-1]
+                d_bandcenter_unocc = integrate.cumtrapz(dos_d_list_E_unocc, energy_unocc)[-1] / \
+                                     integrate.cumtrapz(dos_d_list_total_unocc, energy_unocc)[-1]
                 band_center_dict = {}
                 band_center_dict_occ = {}
+                band_center_dict_unocc = {}
                 element = element_names[element_number]
                 band_center_dict[str(element) + "_s"] = "%3.3f" % s_bandcenter
                 band_center_dict[str(element) + "_p"] = "%3.3f" % p_bandcenter
@@ -570,31 +667,67 @@ class DoscarAnalyzer(object):
                 band_center_dict_occ[str(element) + "_s_occ"] = "%3.3f" % s_bandcenter_occ
                 band_center_dict_occ[str(element) + "_p_occ"] = "%3.3f" % p_bandcenter_occ
                 band_center_dict_occ[str(element) + "_d_occ"] = "%3.3f" % d_bandcenter_occ
+                band_center_dict_unocc[str(element) + "_s_unocc"] = "%3.3f" % s_bandcenter_unocc
+                band_center_dict_unocc[str(element) + "_p_unocc"] = "%3.3f" % p_bandcenter_unocc
+                band_center_dict_unocc[str(element) + "_d_unocc"] = "%3.3f" % d_bandcenter_unocc
+                tmlist = ['Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu']
 
                 if write_dicts_to_file == bool(True):
                     # Write bandcenter dicts to text files
                     filename = "%s_bandcenters.txt" % element
                     file = open(filename, "w")
                     for key, value in band_center_dict.items():
-                        file.write(str(key)+"="+str(value)+"\n")
+                        file.write(str(key) + "=" + str(value) + "\n")
                         if key == "O_p":
-                            Opband = open("O_pband_values.txt", "w")
+                            Opband = open("O_pband_allstates.txt", "w")
                             Opband.write(str(value))
                             Opband.close()
+                        for tm in tmlist:
+                            if tm in key:
+                                if '_d' in key:
+                                    dband = open(tm + '_dband' + '_allstates.txt', "w")
+                                    dband.write(str(value))
+                                    dband.close()
                     file.close()
+                    # Write occupied bandcenter values
                     filename = "%s_bandcenters_occ.txt" % element
                     file = open(filename, "w")
                     for key, value in band_center_dict_occ.items():
-                        file.write(str(key)+"="+str(value)+"\n")
+                        if key == "O_p_occ":
+                            Opband = open("O_pband_occstates.txt", "w")
+                            Opband.write(str(value))
+                            Opband.close()
+                        for tm in tmlist:
+                            if tm in key:
+                                if '_d' in key:
+                                    dband = open(tm + '_dband' + '_occstates.txt', "w")
+                                    dband.write(str(value))
+                                    dband.close()
+                        file.write(str(key) + "=" + str(value) + "\n")
                     file.close()
-
+                    # Write unoccupied bandcenter values
+                    filename = "%s_bandcenters_unocc.txt" % element
+                    file = open(filename, "w")
+                    for key, value in band_center_dict_unocc.items():
+                        if key == "O_p_unocc":
+                            Opband = open("O_pband_unoccstates.txt", "w")
+                            Opband.write(str(value))
+                            Opband.close()
+                        for tm in tmlist:
+                            if tm in key:
+                                if '_d' in key:
+                                    dband = open(tm + '_dband' + '_unoccstates.txt', "w")
+                                    dband.write(str(value))
+                                    dband.close()
+                        file.write(str(key) + "=" + str(value) + "\n")
+                    file.close()
                 band_center_list.append(band_center_dict)
                 band_center_occ_list.append(band_center_dict_occ)
-
-        return band_center_list, band_center_occ_list
+                band_center_unocc_list.append(band_center_dict_unocc)
+        return band_center_list, band_center_occ_list, band_center_unocc_list
 
     def get_effective_dos(self, temperature=1000):
-        boltz = 8.619 * 10 ** -5 #units of eV/K
+        boltz = 8.619 * 10 ** -5  # units of eV/K
         E_VBM, E_CBM = self._calc_VBM_and_CBM()
         energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
         dosdata, total_dos = self._cleanup_projected_dos()
@@ -632,10 +765,10 @@ class DoscarAnalyzer(object):
         CBM_effective_dos = integrate.cumtrapz(CBM_effective_dos_integrand, energy_to_integrate_CBM)[-1]
         CBM_int = integrate.cumtrapz(total_dos_CBM, energy_to_integrate_CBM)[-1]
 
-        #print "The effective DOS of the VB is:", VBM_effective_dos
-        #print "The effective DOS of the CB is:", CBM_effective_dos
-        #print "The integral of the VB DOS is:", VBM_int
-        #print "The integral of the CB DOS is:", CBM_int
+        # print "The effective DOS of the VB is:", VBM_effective_dos
+        # print "The effective DOS of the CB is:", CBM_effective_dos
+        # print "The integral of the VB DOS is:", VBM_int
+        # print "The integral of the CB DOS is:", CBM_int
 
         return (VBM_effective_dos, CBM_effective_dos, VBM_int, CBM_int)
 
@@ -647,11 +780,11 @@ class DoscarAnalyzer(object):
             if 'NEDOS' in line:
                 nedos_found = True
                 NEDOS_info = line
-                NEDOS_info = re.findall('\d+',NEDOS_info)
+                NEDOS_info = re.findall('\d+', NEDOS_info)
                 for entry in NEDOS_info:
                     nedos = int(entry)
 
-        #If no NEDOS is specified in INCAR, use default value of 301
+        # If no NEDOS is specified in INCAR, use default value of 301
         if nedos_found == bool(False):
             nedos = int(301)
 
@@ -667,14 +800,14 @@ class DoscarAnalyzer(object):
         count = 0
         for entry in dosdata:
             if count < nedos:
-                Energy.append(float(entry[0:12])-fermi)
+                Energy.append(float(entry[0:12]) - fermi)
             count += 1
 
         count = 0
         for entry in Energy:
             tol = 0.05
             count += 1
-            if entry > 0-tol and entry < 0+tol: #So the Energy should be between -0.2 and 0.2 eV
+            if entry > 0 - tol and entry < 0 + tol:  # So the Energy should be between -0.2 and 0.2 eV
                 index_Fermi = count
 
         count = 0
@@ -682,7 +815,7 @@ class DoscarAnalyzer(object):
             for entry in Energy:
                 tol = 0.05
                 count += 1
-                if entry > self.energy_cutoff-tol and entry < self.energy_cutoff+tol:
+                if entry > self.energy_cutoff - tol and entry < self.energy_cutoff + tol:
                     index_cutoff = count
 
         Energy_occ = []
@@ -717,12 +850,12 @@ class DoscarAnalyzer(object):
         total_dos = []
         count = 0
         for line in dosdata:
-            if count > 5 and count < nedos+6:
+            if count > 5 and count < nedos + 6:
                 total_dos_rows.append(line)
             count += 1
 
         for index in range(len(total_dos_rows)):
-            #print float(total_dos_rows[index].split()[1])
+            # print float(total_dos_rows[index].split()[1])
             total_dos.append(float(total_dos_rows[index].split()[1]) + float(total_dos_rows[index].split()[2]))
 
         count = 0
@@ -731,7 +864,7 @@ class DoscarAnalyzer(object):
             count += 1
 
         # Eliminate the interspersed junk lines between each atom in DOS data
-        for index in range(len(dosdata)-number_of_atoms):
+        for index in range(len(dosdata) - number_of_atoms):
             if index % nedos == 0 and index != 0:
                 dosdata.pop(index)
 
@@ -742,7 +875,7 @@ class DoscarAnalyzer(object):
         dosdata_fromfile, total_dos_fromfile = self._cleanup_projected_dos()
 
         dosdata = []
-        #Split the lines of the doscar file and make all entries floats rather than strings
+        # Split the lines of the doscar file and make all entries floats rather than strings
         for line in dosdata_fromfile:
             line = line.split()
             for index in range(len(line)):
@@ -763,25 +896,42 @@ class DoscarAnalyzer(object):
             sum_p_down = 0
             sum_d_up = 0
             sum_d_down = 0
+            sum_f_up = 0
+            sum_f_down = 0
             for doscolumn in range(doscolumns):
-                if doscolumn > 0: #Don't include values of energy in sum, only want to sum DOS values
-                    if doscolumn == 1: #s up
+                if doscolumn > 0:  # Don't include values of energy in sum, only want to sum DOS values
+                    if doscolumn == 1:  # s up
                         sum_s_up += dosdata[dosrow][doscolumn]
                     if doscolumn == 2:
                         sum_s_down += dosdata[dosrow][doscolumn]
                     if doscolumn == 3:
-                        sum_p_up += dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn+2] + dosdata[dosrow][doscolumn+4] #Adding columns 3, 5, and 7, which are px, py and pz up
+                        sum_p_up += dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn + 2] + dosdata[dosrow][
+                            doscolumn + 4]  # Adding columns 3, 5, and 7, which are px, py and pz up
                     if doscolumn == 4:
-                        sum_p_down += (dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn+2] + dosdata[dosrow][doscolumn+4]) #Adding columns 4, 6, and 8, which are px, py and pz down
+                        sum_p_down += (dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn + 2] + dosdata[dosrow][
+                            doscolumn + 4])  # Adding columns 4, 6, and 8, which are px, py and pz down
                     if doscolumn > 4 and doscolumn < 9:
                         pass
                     if doscolumn == 9:
-                        sum_d_up += dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn+2] + dosdata[dosrow][doscolumn+4] + dosdata[dosrow][doscolumn+6] + dosdata[dosrow][doscolumn+8] #Adding columns 9, 11, 13, 15 and 17 which are dxy, dyz, dz2, dxz, dx2 up
+                        sum_d_up += dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn + 2] + dosdata[dosrow][
+                            doscolumn + 4] + dosdata[dosrow][doscolumn + 6] + dosdata[dosrow][
+                                        doscolumn + 8]  # Adding columns 9, 11, 13, 15 and 17 which are dxy, dyz, dz2, dxz, dx2 up
                     if doscolumn == 10:
-                        sum_d_down += (dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn+2] + dosdata[dosrow][doscolumn+4] + dosdata[dosrow][doscolumn+6] + dosdata[dosrow][doscolumn+8]) #Adding columns 10, 12, 14, 16 and 18 which are dxy, dyz, dz2, dxz, dx2 down
-                    if doscolumn > 10:
-                        pass
-            dosdata_orbital_summed.append(str(sum_s_up)+" "+str(sum_s_down)+" "+str(sum_p_up)+" "+str(sum_p_down)+" "+str(sum_d_up)+" "+str(sum_d_down)+"\n")
+                        sum_d_down += (
+                        dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn + 2] + dosdata[dosrow][doscolumn + 4] +
+                        dosdata[dosrow][doscolumn + 6] + dosdata[dosrow][
+                            doscolumn + 8])  # Adding columns 10, 12, 14, 16 and 18 which are dxy, dyz, dz2, dxz, dx2 down
+                    if doscolumn == 19:
+                        sum_f_up += dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn + 2] + dosdata[dosrow][
+                            doscolumn + 4] + dosdata[dosrow][doscolumn + 6] + dosdata[dosrow][doscolumn + 8] + \
+                                    dosdata[dosrow][doscolumn + 11]
+                    if doscolumn == 20:
+                        sum_f_down += dosdata[dosrow][doscolumn] + dosdata[dosrow][doscolumn + 2] + dosdata[dosrow][
+                            doscolumn + 4] + dosdata[dosrow][doscolumn + 6] + dosdata[dosrow][doscolumn + 8] + \
+                                      dosdata[dosrow][doscolumn + 11]
+            dosdata_orbital_summed.append(
+                str(sum_s_up) + " " + str(sum_s_down) + " " + str(sum_p_up) + " " + str(sum_p_down) + " " + str(
+                    sum_d_up) + " " + str(sum_d_down) + " " + str(sum_f_up) + " " + str(sum_f_down) + "\n")
 
         for line in dosdata_orbital_summed:
             line = line.split()
@@ -804,9 +954,11 @@ class DoscarAnalyzer(object):
         dos_sum_p_down_list = []
         dos_sum_d_up_list = []
         dos_sum_d_down_list = []
-        for index in range(len(atom_amounts)): #Loop over each atom type
-            #print "analyzing atom type", element_names[index]
-            #print "element", element_names[index], "is element number", element_iteration_count
+        dos_sum_f_up_list = []
+        dos_sum_f_down_list = []
+        for index in range(len(atom_amounts)):  # Loop over each atom type
+            # print "analyzing atom type", element_names[index]
+            # print "element", element_names[index], "is element number", element_iteration_count
             for dos_row in range(nedos):
                 dos_sum_s_up = 0
                 dos_sum_s_down = 0
@@ -814,49 +966,65 @@ class DoscarAnalyzer(object):
                 dos_sum_p_down = 0
                 dos_sum_d_up = 0
                 dos_sum_d_down = 0
+                dos_sum_f_up = 0
+                dos_sum_f_down = 0
                 for atom_number in range(atom_amounts[index]):
                     if index == 0:
                         true_atom_number = atom_number
                     if index == 1:
-                        true_atom_number = atom_number + atom_amounts[index-1]
+                        true_atom_number = atom_number + atom_amounts[index - 1]
                     if index == 2:
-                        true_atom_number = atom_number + atom_amounts[index-1] + atom_amounts[index-2]
+                        true_atom_number = atom_number + atom_amounts[index - 1] + atom_amounts[index - 2]
                     if index == 3:
-                        true_atom_number = atom_number + atom_amounts[index-1] + atom_amounts[index-2] + atom_amounts[index-3]
+                        true_atom_number = atom_number + atom_amounts[index - 1] + atom_amounts[index - 2] + \
+                                           atom_amounts[index - 3]
                     if index == 4:
-                        true_atom_number = atom_number + atom_amounts[index-1] + atom_amounts[index-2] + atom_amounts[index-3] + atom_amounts[index-4]
+                        true_atom_number = atom_number + atom_amounts[index - 1] + atom_amounts[index - 2] + \
+                                           atom_amounts[index - 3] + atom_amounts[index - 4]
                     if index == 5:
-                        true_atom_number = atom_number + atom_amounts[index-1] + atom_amounts[index-2] + atom_amounts[index-3] + atom_amounts[index-4] + atom_amounts[index-5]
-                    dos_sum_s_up += dosdata[dos_row + nedos*true_atom_number][0]
-                    dos_sum_s_down += dosdata[dos_row + nedos*true_atom_number][1]
-                    dos_sum_p_up += dosdata[dos_row + nedos*true_atom_number][2]
-                    dos_sum_p_down += dosdata[dos_row + nedos*true_atom_number][3]
-                    dos_sum_d_up += dosdata[dos_row + nedos*true_atom_number][4]
-                    dos_sum_d_down += dosdata[dos_row + nedos*true_atom_number][5]
+                        true_atom_number = atom_number + atom_amounts[index - 1] + atom_amounts[index - 2] + \
+                                           atom_amounts[index - 3] + atom_amounts[index - 4] + atom_amounts[index - 5]
+                    dos_sum_s_up += dosdata[dos_row + nedos * true_atom_number][0]
+                    dos_sum_s_down += dosdata[dos_row + nedos * true_atom_number][1]
+                    dos_sum_p_up += dosdata[dos_row + nedos * true_atom_number][2]
+                    dos_sum_p_down += dosdata[dos_row + nedos * true_atom_number][3]
+                    dos_sum_d_up += dosdata[dos_row + nedos * true_atom_number][4]
+                    dos_sum_d_down += dosdata[dos_row + nedos * true_atom_number][5]
+                    dos_sum_f_up += dosdata[dos_row + nedos * true_atom_number][6]
+                    dos_sum_f_down += dosdata[dos_row + nedos * true_atom_number][7]
                 dos_sum_s_up_list.append(dos_sum_s_up)
                 dos_sum_s_down_list.append(dos_sum_s_down)
                 dos_sum_p_up_list.append(dos_sum_p_up)
                 dos_sum_p_down_list.append(dos_sum_p_down)
                 dos_sum_d_up_list.append(dos_sum_d_up)
                 dos_sum_d_down_list.append(dos_sum_d_down)
+                dos_sum_f_up_list.append(dos_sum_f_up)
+                dos_sum_f_down_list.append(dos_sum_f_down)
             element_iteration_count += 1
 
         # The dos_sum lists will contain nedos*number_of_elements lines. So, 4 elements with 2000 nedos will be 8000 lines.
         dos_s_list = []
         dos_p_list = []
         dos_d_list = []
+        dos_f_list = []
         dos_sum_up_list = []
         dos_sum_down_list = []
         for index in range(len(dos_sum_s_up_list)):
-            dos_s_list.append(str(dos_sum_s_up_list[index])+" "+str(dos_sum_s_down_list[index])+"\n")
-            dos_p_list.append(str(dos_sum_p_up_list[index])+" "+str(dos_sum_p_down_list[index])+"\n")
-            dos_d_list.append(str(dos_sum_d_up_list[index])+" "+str(dos_sum_d_down_list[index])+"\n")
-            dos_sum_up_list.append(dos_sum_s_up_list[index] + dos_sum_p_up_list[index] + dos_sum_d_up_list[index])
-            dos_sum_down_list.append(dos_sum_s_down_list[index] + dos_sum_p_down_list[index] + dos_sum_d_down_list[index])
+            dos_s_list.append(str(dos_sum_s_up_list[index]) + " " + str(dos_sum_s_down_list[index]) + "\n")
+            dos_p_list.append(str(dos_sum_p_up_list[index]) + " " + str(dos_sum_p_down_list[index]) + "\n")
+            dos_d_list.append(str(dos_sum_d_up_list[index]) + " " + str(dos_sum_d_down_list[index]) + "\n")
+            dos_f_list.append(str(dos_sum_f_up_list[index]) + " " + str(dos_sum_f_down_list[index]) + "\n")
+            dos_sum_up_list.append(
+                dos_sum_s_up_list[index] + dos_sum_p_up_list[index] + dos_sum_d_up_list[index] + dos_sum_f_up_list[
+                    index])
+            dos_sum_down_list.append(
+                dos_sum_s_down_list[index] + dos_sum_p_down_list[index] + dos_sum_d_down_list[index] +
+                dos_sum_f_down_list[index])
 
         dos_s_list_float = []
         dos_p_list_float = []
         dos_d_list_float = []
+        dos_f_list_float = []
         for line in dos_s_list:
             line = line.split()
             for index in range(len(line)):
@@ -872,8 +1040,13 @@ class DoscarAnalyzer(object):
             for index in range(len(line)):
                 line[index] = float(line[index])
             dos_d_list_float.append(line)
+        for line in dos_f_list:
+            line = line.split()
+            for index in range(len(line)):
+                line[index] = float(line[index])
+            dos_f_list_float.append(line)
 
-        #Now get total DOS by summing all projected dos
+        # Now get total DOS by summing all projected dos
         total_dos_up_list = []
         total_dos_down_list = []
         for dos_row in range(nedos):
@@ -881,32 +1054,32 @@ class DoscarAnalyzer(object):
             sum_dos_down = 0
             for index in range(len(atom_amounts)):
                 # These are normalized by number of atoms of each element type
-                sum_dos_up += (dos_sum_up_list[dos_row + nedos*index])/atom_amounts[index]
-                sum_dos_down += (dos_sum_down_list[dos_row + nedos*index])/atom_amounts[index]
+                sum_dos_up += (dos_sum_up_list[dos_row + nedos * index]) / atom_amounts[index]
+                sum_dos_down += (dos_sum_down_list[dos_row + nedos * index]) / atom_amounts[index]
                 # These are not normalized by atom number
-                #sum_dos_up += (dos_sum_up_list[dos_row + nedos*index])
-                #sum_dos_down += (dos_sum_down_list[dos_row + nedos*index])
+                # sum_dos_up += (dos_sum_up_list[dos_row + nedos*index])
+                # sum_dos_down += (dos_sum_down_list[dos_row + nedos*index])
 
-            total_dos_up_list.append(sum_dos_up) #This is normalized by atom amounts of each element present
+            total_dos_up_list.append(sum_dos_up)  # This is normalized by atom amounts of each element present
             total_dos_down_list.append(sum_dos_down)
 
-        #print "length total dos up", len(total_dos_up_list)
-        #print "length sum dos up list", len(dos_sum_up_list)
-        return total_dos_up_list, total_dos_down_list, dos_s_list_float, dos_p_list_float, dos_d_list_float
+        # print "length total dos up", len(total_dos_up_list)
+        # print "length sum dos up list", len(dos_sum_up_list)
+        return total_dos_up_list, total_dos_down_list, dos_s_list_float, dos_p_list_float, dos_d_list_float, dos_f_list_float
 
     def _calc_VBM_and_CBM(self):
-        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list = self._parse_dos_atom_type()
+        total_dos_up_list, total_dos_down_list, dos_s_list, dos_p_list, dos_d_list, dos_f_list = self._parse_dos_atom_type()
         energy, energy_unocc, energy_occ, index_Fermi, index_cutoff = self._make_energy_lists()
         nedos = self._calc_nedos()
         Etolerance = 0.1
         DOStolerance = 0.01
 
-        #Take the total dos as separate up and down spin and combine to be summed total DOS
+        # Take the total dos as separate up and down spin and combine to be summed total DOS
         total_dos = []
         for index in range(len(total_dos_up_list)):
-            total_dos.append(total_dos_up_list[index]+total_dos_down_list[index])
+            total_dos.append(total_dos_up_list[index] + total_dos_down_list[index])
 
-        #Find the position of the VBM
+        # Find the position of the VBM
         for index in range(nedos):
             if energy[index] >= 0 - Etolerance:
                 if energy[index] <= 0 + Etolerance:
@@ -920,13 +1093,13 @@ class DoscarAnalyzer(object):
         for index in range(nedos - VBM_index):
             E_above_VBM_range.append(VBM_index + index)
 
-        #Now calculate the band gap
+        # Now calculate the band gap
         for entry in E_above_VBM_range:
-            if abs(total_dos[entry] - total_dos[entry-1]) > 0 + DOStolerance:
+            if abs(total_dos[entry] - total_dos[entry - 1]) > 0 + DOStolerance:
                 CBM_index = entry
                 E_CBM = energy[entry]
                 break
-            elif abs(total_dos[entry] - total_dos[entry-1]) < 0 + DOStolerance:
+            elif abs(total_dos[entry] - total_dos[entry - 1]) < 0 + DOStolerance:
                 pass
 
         return E_VBM, E_CBM
@@ -994,7 +1167,7 @@ class StabilityAnalyzer(object):
             entries_in_system = self._create_chemical_system_from_MP()
             pd_entry_list = self._create_pdentry()
             for entry in pd_entry_list:
-                print("The PDEntry given for this system is:", entry, " eV/cell")
+                print "The PDEntry given for this system is:", entry, " eV/cell"
 
         elif use_custom_chem_pots == bool(True):
             entries_in_system = self._create_chemical_system_from_MP_and_remove_endmembers(species_to_remove=[key for key in custom_chem_pot_dict.keys()])
@@ -1005,9 +1178,9 @@ class StabilityAnalyzer(object):
                 entries_in_system.append(chempot_pdentry)
                 pd_entry_list_chempots.append(chempot_pdentry)
             for entry in pd_entry_list:
-                print("The PDEntry given for this system is:", entry, " eV/cell")
+                print "The PDEntry given for this system is:", entry, " eV/cell"
             for entry in pd_entry_list_chempots:
-                print("The PDEntry of new chemical potential is:", entry, " eV")
+                print "The PDEntry of new chemical potential is:", entry, " eV"
 
         # Add all new PDEntry objects from pd_entry_list to the chemical system for phase stability analysis
         if len(pd_entry_list) > 0:
@@ -1028,7 +1201,7 @@ class StabilityAnalyzer(object):
                 pd_entry_list.append(organic_pdentry)
                 entries_in_system.append(organic_pdentry)
                 organic_count += 1
-            print("%i organic molecules have been added to the chemical system!" % organic_count)
+            print "%i organic molecules have been added to the chemical system!" % organic_count
 
         phasediagram = PhaseDiagram(entries=entries_in_system)
         phasediagram_analyzer = PDAnalyzer(phasediagram)
@@ -1044,14 +1217,14 @@ class StabilityAnalyzer(object):
 
 
         for entry in pd_entry_list:
-            print("Analyzing entry:", entry)
+            print "Analyzing entry:", entry
             energy_above_hull = phasediagram_analyzer.get_e_above_hull(entry=entry)
             energy_above_hull *= 1000 # in units of meV/atom
-            print("The energy above hull (in meV/atom) for this system is:", energy_above_hull)
+            print "The energy above hull (in meV/atom) for this system is:", energy_above_hull
             eabove_file.write(str(energy_above_hull)+"\n")
             e_form = phasediagram.get_form_energy_per_atom(entry=entry)
             #e_form *= 1000 # in units of meV/atom
-            print("The formation energy (in eV/atom) for this system is:", e_form)
+            print "The formation energy (in eV/atom) for this system is:", e_form
             eform_file.write(str(e_form)+"\n")
 
         # Write the stable entries to a file
@@ -1089,25 +1262,25 @@ class StabilityAnalyzer(object):
             oa = OszicarAnalyzer(oszicar=self.oszicar, poscar=self.poscar)
             energy = oa.get_energy()
             composition_dict = pa.get_composition_dict()
-            print("The unshifted energy per cell is:", energy)
+            print "The unshifted energy per cell is:", energy
             # Find which elements in material correspond to those that need shifting, if any, and apply energy shift
             for key in composition_dict.keys():
                 if key in energy_shift_dict.keys():
                     energy -= energy_shift_dict[key]*composition_dict[key]
-            print("The shifted energy per cell is:", energy)
+            print "The shifted energy per cell is:", energy
             energy_list.append(energy)
 
         elif self.get_data_from_VASP_files == bool(False):
             if len(self.composition_energy) > 0:
                 for index, entry in enumerate(self.composition_energy):
                     energy = entry
-                    print("The unshifted energy is:", energy)
+                    print "The unshifted energy is:", energy
 
                     # Find which elements in material correspond to those that need shifting, if any, and apply energy shift
                     for key in self.composition_dict[index].keys():
                         if key in energy_shift_dict.keys():
                             energy -= energy_shift_dict[key]*self.composition_dict[index][key]
-                    print("The shifted energy is:", energy)
+                    print "The shifted energy is:", energy
                     energy_list.append(energy)
 
         return energy_list
@@ -1131,12 +1304,12 @@ class StabilityAnalyzer(object):
             if len(self.additional_elements_to_include) > 0:
                 for entry in self.additional_elements_to_include:
                     if entry not in element_names:
-                        print("%s is being added to the list of elements ..." % str(entry))
+                        print "%s is being added to the list of elements ..." % str(entry)
                         element_names.append(entry)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            print("Getting materials info from MP for the elements %s" % element_names, ", this may take a minute ...")
+            print "Getting materials info from MP for the elements %s" % element_names, ", this may take a minute ..."
             entries_in_system = mp.get_entries_in_chemsys(element_names)
 
         return entries_in_system
@@ -1154,7 +1327,7 @@ class StabilityAnalyzer(object):
             for index, composition in enumerate(self.composition_dict):
                 comp = Composition(composition)
                 pd_entry = PDEntry(comp, energy_list[index])
-                print("The PDEntry given for this system is:", pd_entry, " eV/cell")
+                print "The PDEntry given for this system is:", pd_entry, " eV/cell"
                 pd_entry_list.append(pd_entry)
         return pd_entry_list
 
@@ -1185,7 +1358,7 @@ class StabilityAnalyzer(object):
         mp_list_I = ["mp-23153", "mp-639751", "mp-601148", "mp-684663"]
         mp_list_together = [mp_list_O, mp_list_H, mp_list_N, mp_list_F, mp_list_Cl, mp_list_Br, mp_list_I]
         mp_dict = {"O": 0, "H": 1, "N": 2, "F": 3, "Cl": 4, "Br": 5, "I": 6}
-        print('Species to remove', species_to_remove)
+        print 'Species to remove', species_to_remove
 
         for species in species_to_remove:
             count = 0
@@ -1194,7 +1367,7 @@ class StabilityAnalyzer(object):
                 for entry in entries_in_system:
                     if entry != pd_entry:
                         if entry.entry_id in mp_list_to_use:
-                            print("removing an %s entry," % species, " entry ID number", entry.entry_id)
+                            print "removing an %s entry," % species, " entry ID number", entry.entry_id
                             entries_in_system.remove(entry)
                             count += 1
 
@@ -1204,7 +1377,7 @@ class StabilityAnalyzer(object):
                 for entry in self.material_ids_to_remove:
                     for mpentry in entries_in_system:
                         if mpentry.entry_id == entry:
-                            print("removing material %s" % mpentry.entry_id)
+                            print "removing material %s" % mpentry.entry_id
                             entries_in_system.remove(mpentry)
 
         return entries_in_system
@@ -1313,11 +1486,11 @@ class StabilityAnalyzer(object):
                 organic_compositions.append(entry1)
                 organic_energies.append(entry2)
 
-        print("Adding %i organic molecules" % len(organic_compositions))
-        print("The list of organic molecules is:")
-        print(organic_compositions)
-        print("The list of organic molecule energies is:")
-        print(organic_energies)
+        print "Adding %i organic molecules" % len(organic_compositions)
+        print "The list of organic molecules is:"
+        print organic_compositions
+        print "The list of organic molecule energies is:"
+        print organic_energies
 
         return organic_compositions, organic_energies
 
@@ -1615,7 +1788,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (EN2_PBE - N2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print("WARNING: You are calculating N2 energy with the materials project energy shift, this has not been well-tested!!!")
+                    print "WARNING: You are calculating N2 energy with the materials project energy shift, this has not been well-tested!!!"
                     mu = (EN2_PBE + N_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         if self.temperature > 500:
@@ -1628,7 +1801,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (EN2_PBE - N2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print("WARNING: You are calculating N2 energy with the materials project energy shift, this has not been well-tested!!!")
+                    print "WARNING: You are calculating N2 energy with the materials project energy shift, this has not been well-tested!!!"
                     mu = (EN2_PBE + N_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1668,7 +1841,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (EF2_PBE - F2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print("WARNING: You are calculating F2 energy with the materials project energy shift, this has not been well-tested!!!")
+                    print "WARNING: You are calculating F2 energy with the materials project energy shift, this has not been well-tested!!!"
                     mu = (EF2_PBE + F_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1714,7 +1887,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (ECl2_PBE - Cl2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print("WARNING: You are calculating Cl2 energy with the materials project energy shift, this has not been well-tested!!!")
+                    print "WARNING: You are calculating Cl2 energy with the materials project energy shift, this has not been well-tested!!!"
                     mu = (ECl2_PBE + Cl_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         if self.temperature > 500:
@@ -1727,7 +1900,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (ECl2_PBE - Cl2_shift_from0K + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print("WARNING: You are calculating Cl2 energy with the materials project energy shift, this has not been well-tested!!!")
+                    print "WARNING: You are calculating Cl2 energy with the materials project energy shift, this has not been well-tested!!!"
                     mu = (ECl2_PBE + Cl_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1769,7 +1942,7 @@ class ChemicalPotentialAnalyzer():
                 if self.energy_shift == False:
                     mu = (EBr2_PBE - Br2_shift_from0K + H_vap_Br2 + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
                 if self.energy_shift == True:
-                    print("NOTE: There is currently no energy shift for Br2 implemented in Materials Project. You will get the same answer as if no shift is applied!")
+                    print "NOTE: There is currently no energy shift for Br2 implemented in Materials Project. You will get the same answer as if no shift is applied!"
                     mu = (EBr2_PBE - Br2_shift_from0K + H_vap_Br2 + Br_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1829,7 +2002,7 @@ class ChemicalPotentialAnalyzer():
             if self.energy_shift == False:
                 mu = (EI2_PBE - I2_shift_from0K + H_fusion_I2 + H_vap_I2 + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
             if self.energy_shift == True:
-                print("NOTE: There is currently no energy shift for I2 implemented in Materials Project. You will get the same answer as if no shift is applied!")
+                print "NOTE: There is currently no energy shift for I2 implemented in Materials Project. You will get the same answer as if no shift is applied!"
                 mu = (EI2_PBE - I2_shift_from0K + H_fusion_I2 + H_vap_I2 + I_shift_PBE + HT_H0 - self.temperature*S0 + k*self.temperature*math.log(self.pressure/P0))/2
 
         return mu, HT_H0, S0
@@ -1837,13 +2010,13 @@ class ChemicalPotentialAnalyzer():
     def _check_input(self):
         func_list = ["pw91", "PW91", "PBE", "pbe"]
         if self.temperature <= 0:
-            print("ERROR: You have selected on a nonsensical temperature. Exiting...")
+            print "ERROR: You have selected on a nonsensical temperature. Exiting..."
             exit()
         if self.pressure <= 0:
-            print("ERROR: You have selected on a nonsensical pressure. Exiting...")
+            print "ERROR: You have selected on a nonsensical pressure. Exiting..."
             exit()
         if self.functional not in func_list:
-            print("ERROR: You must specify one of either PW91 or PBE functionals. Exiting...")
+            print "ERROR: You must specify one of either PW91 or PBE functionals. Exiting..."
             exit()
         # if self.energy_shift == "True":
         #    print "Applying the shift corrections"

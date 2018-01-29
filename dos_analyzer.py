@@ -53,7 +53,6 @@ plot_total_dos = False
 # Specify whether or not to create a plot of the Projected Density of States (True/False)
 plot_projected_dos = True
 include_plot_labels = False
-pickle_plot = False
 use_custom_colors = True
 
 # Specify whether or not to calculate the bandgap (True/False)
@@ -81,7 +80,7 @@ def main():
     if plot_total_dos == bool(True):
         dos.plot_total_dos()
     if plot_projected_dos == bool(True):
-        plot = dos.plot_projected_dos(plot_labels=str(include_plot_labels), pickle_plot=str(pickle_plot), use_custom_color_type=str(use_custom_colors))
+        plot = dos.plot_projected_dos(plot_labels=str(include_plot_labels), use_custom_color_type=str(use_custom_colors))
     if calculate_bandcenters == bool(True):
         dos.get_bandcenters(write_dicts_to_file=write_bandcenters_to_file)
     if calculate_bandgap == bool(True):

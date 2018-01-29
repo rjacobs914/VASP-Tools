@@ -72,6 +72,9 @@ msd_smoothing_method = "max"
 # diffusion is really occurring.
 plot_mean_squared_displacement = True
 
+# Specify names of the XDATCAR file(s) you wish to analyze. Files from multiple AIMD runs should be placed in the same
+# directory with names as e.g. XDATCAR1, XDATCAR2, etc.
+xdatcar_file_names = ['XDATCAR']
 
 ########################################################################################################################
 ########################################################################################################################
@@ -79,7 +82,7 @@ plot_mean_squared_displacement = True
 from VASP_PostProcessing import DiffusionAnalyzerAIMD
 
 def main():
-    diff = DiffusionAnalyzerAIMD(xdatcar="XDATCAR", diffusing_species=element_of_diffusing_species, temperature=temperature,
+    diff = DiffusionAnalyzerAIMD(xdatcar=xdatcar_file_names, diffusing_species=element_of_diffusing_species, temperature=temperature,
                         timestep=timestep_size, steps_to_ignore=100, smoothing=msd_smoothing_method, min_obs=30,
                         avg_nsteps=1000, plot_msd=plot_mean_squared_displacement)
     diff.get_diffusion_analysis_from_xdatcars()
