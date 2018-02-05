@@ -114,11 +114,11 @@ class PoscarAnalyzer(object):
             lattice_parameters_split.append(lattice_parameters[index].split())
         for index in range(len(lattice_parameters_split)):
             if index == 0:
-                lattice_parameters_xcolumn = np.array([float(lattice_parameters_split[index][index]), float(lattice_parameters_split[index+1][index]), float(lattice_parameters_split[index+2][index])])
+                lattice_parameters_xcolumn = np.array([float(lattice_parameters_split[index][index]), float(lattice_parameters_split[index][index+1]), float(lattice_parameters_split[index][index+2])])
             if index == 1:
-                lattice_parameters_ycolumn = np.array([float(lattice_parameters_split[index-1][index]), float(lattice_parameters_split[index][index]), float(lattice_parameters_split[index+1][index])])
+                lattice_parameters_ycolumn = np.array([float(lattice_parameters_split[index][index-1]), float(lattice_parameters_split[index][index]), float(lattice_parameters_split[index][index+1])])
             if index == 2:
-                lattice_parameters_zcolumn = np.array([float(lattice_parameters_split[index-2][index]), float(lattice_parameters_split[index-1][index]), float(lattice_parameters_split[index][index])])
+                lattice_parameters_zcolumn = np.array([float(lattice_parameters_split[index][index-2]), float(lattice_parameters_split[index][index-1]), float(lattice_parameters_split[index][index])])
         lattice_parameters = np.array([lattice_parameters_xcolumn, lattice_parameters_ycolumn, lattice_parameters_zcolumn])
         poscar.close()
         return lattice_parameters
@@ -176,9 +176,16 @@ class PoscarAnalyzer(object):
         lattice_parameters = self.get_lattice_parameters()
 
         for index in range(len(atom_positions_array[0])):
-            x_coords_cart.append(atom_positions_array[0][index]*lattice_parameters[0][0]+atom_positions_array[1][index]*lattice_parameters[0][1]+atom_positions_array[2][index]*lattice_parameters[0][2])
-            y_coords_cart.append(atom_positions_array[0][index]*lattice_parameters[1][0]+atom_positions_array[1][index]*lattice_parameters[1][1]+atom_positions_array[2][index]*lattice_parameters[1][2])
-            z_coords_cart.append(atom_positions_array[0][index]*lattice_parameters[2][0]+atom_positions_array[1][index]*lattice_parameters[2][1]+atom_positions_array[2][index]*lattice_parameters[2][2])
+            for index in range(len(atom_positions_array[0])):
+                x_coords_cart.append(
+                    atom_positions_array[0][index] * lattice_parameters[0][0] + atom_positions_array[1][index] *
+                    lattice_parameters[1][0] + atom_positions_array[2][index] * lattice_parameters[2][0])
+                y_coords_cart.append(
+                    atom_positions_array[0][index] * lattice_parameters[0][1] + atom_positions_array[1][index] *
+                    lattice_parameters[1][1] + atom_positions_array[2][index] * lattice_parameters[2][1])
+                z_coords_cart.append(
+                    atom_positions_array[0][index] * lattice_parameters[0][2] + atom_positions_array[1][index] *
+                    lattice_parameters[1][2] + atom_positions_array[2][index] * lattice_parameters[2][2])
 
         for index in range(len(x_coords_cart)):
             atom_positions_array_x = np.insert(atom_positions_array_x, index, x_coords_cart[index])
